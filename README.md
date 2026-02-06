@@ -466,8 +466,9 @@ EDAMAME Core includes an MCP (Model Context Protocol) server, enabling external 
 mcp_start_server(port, psk, enable_cors, listen_all_interfaces) -> String
 mcp_stop_server() -> String
 mcp_get_server_status() -> String
-mcp_generate_psk() -> String  (via edamame_posture CLI)
 ```
+
+> PSK generation is available via the Posture CLI: `edamame-posture mcp-generate-psk`
 
 ---
 
@@ -542,7 +543,7 @@ Complete list of all RPC-registered API methods, organized by domain. Each metho
 
 See [API_REFERENCE.md](API_REFERENCE.md) for the full API reference with parameter types and descriptions.
 
-### Core (25 methods)
+### Core (26 methods)
 
 System lifecycle, device information, and platform management.
 
@@ -593,7 +594,7 @@ Security scoring, threat detection, and remediation.
 | `get_threats_url` | -- | String | Threat model source URL |
 | `get_history` | -- | OrderHistoryAPI | Remediation history |
 
-### Network / Flodbadd (70 methods)
+### Network / Flodbadd (71 methods)
 
 LAN scanning, packet capture, session analysis, whitelists/blacklists, and anomaly detection.
 
@@ -627,7 +628,7 @@ LAN scanning, packet capture, session analysis, whitelists/blacklists, and anoma
 | `get_session_remediation` | uid: String | String | AI remediation for session |
 | `get_packet_stats` | -- | PacketStatsAPI | Capture statistics |
 | `get_analyzer_stats` | -- | AnalyzerStatsAPI | ML analyzer statistics |
-| ... | | | See [API_REFERENCE.md](API_REFERENCE.md) for all 70 methods |
+| ... | | | See [API_REFERENCE.md](API_REFERENCE.md) for all 71 methods |
 
 ### Breach Detection / Pwned (8 methods)
 
@@ -714,7 +715,7 @@ AI-powered security automation with multiple LLM providers.
 | `oauth_get_status` | -- | OAuthStatusAPI | OAuth authentication status |
 | `oauth_open_signup` | -- | bool | Open sign-up page |
 
-### MCP Server (4 methods)
+### MCP Server (3 methods)
 
 MCP server management (feature-gated: `mcp`).
 
@@ -723,6 +724,8 @@ MCP server management (feature-gated: `mcp`).
 | `mcp_start_server` | port, psk, enable_cors, listen_all_interfaces | String | Start MCP server |
 | `mcp_stop_server` | -- | String | Stop MCP server |
 | `mcp_get_server_status` | -- | String | Server running status |
+
+> **Note**: PSK generation (`mcp_generate_psk`) is provided by the [EDAMAME Posture CLI](https://github.com/edamametechnologies/edamame_posture_cli), not by EDAMAME Core directly.
 
 ---
 
@@ -738,7 +741,7 @@ EDAMAME Core is **closed source** and available for OEM integration into third-p
 ### What You Get
 
 - The complete EDAMAME security engine as a linkable library
-- All 150+ API methods across security scoring, network analysis, breach detection, AI automation, and compliance
+- All 175+ API methods across security scoring, network analysis, breach detection, AI automation, and compliance
 - Cross-platform support from a single codebase
 - Reactive event system for building responsive UIs
 - gRPC interface for remote management
