@@ -33,6 +33,8 @@ System initialization, lifecycle management, device information, and platform ut
 
 ### initialize
 
+> **Note**: `initialize` is a special entry point, not registered via the `rpc!()` macro. It accepts a platform-specific `StreamSink` for event delivery (Flutter) or is called without it (standalone/CLI). It must be called before any other API method.
+
 ```
 initialize(
     executable_type: String,
@@ -48,6 +50,17 @@ initialize(
 ```
 
 Initialize EDAMAME Core. Must be called before any other API method. Configures feature availability and event delivery.
+
+Parameters:
+- `executable_type`: Identifies the consumer (e.g., "app", "posture", "cli")
+- `branch`: Threat model branch to use (typically "main")
+- `locale`: User locale for localized threat descriptions (e.g., "en", "fr")
+- `device_info`: JSON-encoded device information string
+- `sink`: Flutter `StreamSink<u64>` for receiving event bitmasks (omitted in standalone builds)
+- `pwned`: Enable breach detection feature
+- `flodbadd`: Enable network scanning and capture feature
+- `trust`: Enable domain connection and compliance feature
+- `agentic`: Enable AI automation feature
 
 ### terminate
 
