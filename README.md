@@ -32,34 +32,34 @@ EDAMAME Core follows a strict **three-layer architecture**:
 
 ```
 +------------------------------------------------------------------+
-|                    Consumer Layer                                  |
+|                    Consumer Layer                                |
 |   Flutter Bridge (GUI)  |  gRPC (CLI)  |  MCP (AI Agents)        |
 +------------------------------------------------------------------+
                               |
                               v
 +------------------------------------------------------------------+
-|                      API Layer (api_*.rs)                          |
-|  - Thin wrappers around business logic                            |
-|  - Type conversions (internal -> serializable API types)          |
-|  - RPC endpoint registration via rpc!() macro                     |
-|  - Background task orchestration                                  |
+|                      API Layer (api_*.rs)                        |
+|  - Thin wrappers around business logic                           |
+|  - Type conversions (internal -> serializable API types)         |
+|  - RPC endpoint registration via rpc!() macro                    |
+|  - Background task orchestration                                 |
 +------------------------------------------------------------------+
                               |
                               v
 +------------------------------------------------------------------+
-|               Core Manager Layer (core_manager_*.rs)              |
-|  - ALL business logic                                             |
-|  - State management                                               |
-|  - Guard protection for concurrent access                         |
-|  - Event triggering                                               |
+|               Core Manager Layer (core_manager_*.rs)             |
+|  - ALL business logic                                            |
+|  - State management                                              |
+|  - Guard protection for concurrent access                        |
+|  - Event triggering                                              |
 +------------------------------------------------------------------+
                               |
                               v
 +------------------------------------------------------------------+
-|                    Core State (core_state.rs)                      |
-|  - Shared state containers (Arc<CustomRwLock<>>)                  |
-|  - Thread-safe concurrent access                                  |
-|  - Feature-gated fields                                           |
+|                    Core State (core_state.rs)                    |
+|  - Shared state containers (Arc<CustomRwLock<>>)                 |
+|  - Thread-safe concurrent access                                 |
+|  - Feature-gated fields                                          |
 +------------------------------------------------------------------+
 ```
 
