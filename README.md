@@ -19,7 +19,7 @@ For the full ecosystem overview, see the [EDAMAME Technologies profile](https://
 5. [API Overview](#api-overview)
 6. [Event System](#event-system)
 7. [gRPC Interface](#grpc-interface)
-8. [MCP Server](#mcp-server)
+8. [MCP Server](#mcp-server) -- see also **[MCP.md](MCP.md)** for complete tool reference
 9. [Integration Patterns](#integration-patterns)
 10. [API Reference](#api-reference)
 11. [OEM Licensing](#oem-licensing)
@@ -448,17 +448,31 @@ EDAMAME Core includes an MCP (Model Context Protocol) server, enabling external 
 | Bind address | 127.0.0.1 | `listen_all_interfaces` for remote access |
 | Authentication | PSK (Pre-Shared Key) | Bearer token, minimum 32 characters |
 
-### MCP Tools Exposed
+### MCP Tools Exposed (19 tools)
 
-| Tool | Description |
-|------|-------------|
-| `advisor_get_todos` | Get all security recommendations |
-| `advisor_get_action_history` | Audit trail of AI actions |
-| `advisor_undo_action` | Rollback a specific action |
-| `advisor_undo_all_actions` | Rollback all actions |
-| `agentic_process_todos` | AI-powered "Do It For Me" workflow |
-| `agentic_execute_action` | Execute a pending action |
-| `agentic_get_workflow_status` | Get current workflow progress |
+See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, return types, and L7 session field documentation.
+
+| # | Tool | Category | Description |
+|---|------|----------|-------------|
+| 1 | `advisor_get_todos` | Advisor | Security todos list |
+| 2 | `advisor_get_action_history` | Advisor | AI action audit trail |
+| 3 | `advisor_undo_action` | Advisor | Rollback specific action |
+| 4 | `advisor_undo_all_actions` | Advisor | Rollback all actions |
+| 5 | `get_sessions` | Observation | All sessions with L7 enrichment |
+| 6 | `get_anomalous_sessions` | Observation | ML-flagged anomalous sessions |
+| 7 | `get_blacklisted_sessions` | Observation | Sessions to known-bad destinations |
+| 8 | `get_exceptions` | Observation | Whitelist/policy violations |
+| 9 | `get_lan_devices` | Observation | LAN device inventory |
+| 10 | `get_lan_host_device` | Observation | This host's LAN identity |
+| 11 | `get_breaches` | Observation | HIBP breach data |
+| 12 | `get_score` | Observation | Full posture score |
+| 13 | `add_pwned_email` | Identity | Add email to breach monitoring |
+| 14 | `remove_pwned_email` | Identity | Remove email from monitoring |
+| 15 | `get_pwned_emails` | Identity | List monitored emails |
+| 16 | `set_lan_auto_scan` | LAN Config | Toggle continuous scanning |
+| 17 | `agentic_process_todos` | Agentic | AI-powered todo processing |
+| 18 | `agentic_execute_action` | Agentic | Execute pending action |
+| 19 | `agentic_get_workflow_status` | Agentic | Workflow progress |
 
 ### MCP API Methods
 
@@ -630,9 +644,20 @@ LAN scanning, packet capture, session analysis, whitelists/blacklists, and anoma
 | `get_analyzer_stats` | -- | AnalyzerStatsAPI | ML analyzer statistics |
 | ... | | | See [API_REFERENCE.md](API_REFERENCE.md) for all 71 methods |
 
+#### L7 Session Enrichment
+
+Every session returned by `get_sessions` and related methods includes deep L7 process attribution fields. See [MCP.md](MCP.md#l7-session-enrichment-fields) for the complete field reference.
+
+Key fields: `pid`, `process_name`, `process_path`, `cmd`, `cwd`, `parent_pid`, `parent_process_name`, `parent_process_path`, `parent_cmd`, `parent_script_path`, `spawned_from_tmp`, `open_files`, `memory`, `cpu_usage`, `disk_usage`.
+
+- **Parent process lineage**: Full parent chain for detecting script-based and interpreter-wrapped attacks
+- **Sensitive file detection**: SSH keys, credentials, keychains tracked in `open_files` (sticky across refresh cycles)
+- **Temp-origin detection**: `spawned_from_tmp` flags processes originating from `/tmp/`, `/var/tmp/`, `/dev/shm/`
+- **Refresh cycles**: Full L7 refresh every 5 minutes; sensitive files re-scanned every 30s (Linux), 60s (macOS), 120s (Windows)
+
 ### Breach Detection / Pwned (8 methods)
 
-Email breach monitoring via HaveIBeenPwned integration.
+Email breach monitoring via HaveIBeenPwned integration. Supports dynamic add/remove of monitored emails via `add_pwned_email` and `remove_pwned_email`, enabling runtime identity registration (e.g., from an AI agent's introspection loop). Also available as MCP tools (see [MCP.md](MCP.md#identity--hibp-management-tools)).
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
