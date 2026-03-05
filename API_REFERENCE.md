@@ -1293,7 +1293,9 @@ agentic_set_llm_config(
     mcp_psk: String,
     slack_bot_token: String,
     slack_actions_channel: String,
-    slack_escalations_channel: String
+    slack_escalations_channel: String,
+    telegram_bot_token: String,
+    telegram_chat_id: String
 ) -> bool
 ```
 
@@ -1479,6 +1481,77 @@ oauth_open_signup() -> bool
 
 Open the browser to the EDAMAME Portal sign-up page.
 
+### Divergence Detection
+
+Behavioral model management and divergence detection between the reasoning plane (cortex extrapolator) and the execution plane (observed traffic). Requires the `agentic` feature flag.
+
+#### upsert_behavioral_model
+
+```
+upsert_behavioral_model(window_json: String) -> String
+```
+
+Push behavioral predictions from the reasoning plane. Accepts a JSON-encoded window of predicted behavior. Returns status JSON.
+
+Behavioral window schema (v3):
+- `window_start`, `window_end`, `ingested_at`, `version`, `hash`
+- `predictions[]` with `session_key`, `action`, `tools_called`
+- expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
+- negative dimensions: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
+
+#### get_behavioral_model
+
+```
+get_behavioral_model() -> String
+```
+
+Read the current behavioral model as JSON.
+
+#### get_divergence_verdict
+
+```
+get_divergence_verdict() -> String
+```
+
+Get the latest divergence detection verdict as JSON.
+Includes evidence from deterministic correlation, safety-floor rules, and vulnerability-detection findings.
+
+#### get_divergence_history
+
+```
+get_divergence_history(limit: usize) -> String
+```
+
+Get rolling history of divergence verdicts as JSON. `limit` caps the number of entries returned.
+
+#### clear_behavioral_model
+
+```
+clear_behavioral_model() -> ()
+```
+
+Reset the behavioral model. For testing and debugging only. Not exposed via MCP.
+
+#### start_divergence_engine
+
+```
+start_divergence_engine(enabled: bool, interval_secs: u64) -> String
+```
+
+Enable or disable the divergence engine with optional interval configuration. Returns status JSON.
+
+#### get_divergence_engine_status
+
+```
+get_divergence_engine_status() -> String
+```
+
+Get engine status as JSON: running state, interval, last run timestamp, model age, last verdict.
+
+**MCP tools**: Five of these methods are exposed as MCP tools: `upsert_behavioral_model`, `get_behavioral_model`, `get_divergence_verdict`, `get_divergence_history`, and `get_divergence_engine_status`.
+
+`start_divergence_engine` and `clear_behavioral_model` are direct API control-plane methods and are not exposed via MCP tools.
+
 ---
 
 ## MCP Server
@@ -1510,6 +1583,39 @@ mcp_get_server_status() -> String
 ```
 
 Returns the MCP server status (running/stopped, port, etc.).
+
+### MCP Tool Surface (24 tools)
+
+The MCP server currently exposes these tools from `mcp/handler.rs`:
+
+| Category | Tool |
+|----------|------|
+| Advisor | `advisor_get_todos` |
+| Advisor | `advisor_get_action_history` |
+| Advisor | `advisor_undo_action` |
+| Advisor | `advisor_undo_all_actions` |
+| Observation | `get_sessions` |
+| Observation | `get_anomalous_sessions` |
+| Observation | `get_blacklisted_sessions` |
+| Observation | `get_exceptions` |
+| Observation | `get_lan_devices` |
+| Observation | `get_lan_host_device` |
+| Observation | `get_breaches` |
+| Identity | `add_pwned_email` |
+| Identity | `remove_pwned_email` |
+| Identity | `get_pwned_emails` |
+| Configuration | `set_lan_auto_scan` |
+| Posture | `get_score` |
+| Agentic | `agentic_process_todos` |
+| Agentic | `agentic_execute_action` |
+| Agentic | `agentic_get_workflow_status` |
+| Divergence | `upsert_behavioral_model` |
+| Divergence | `get_behavioral_model` |
+| Divergence | `get_divergence_verdict` |
+| Divergence | `get_divergence_history` |
+| Divergence | `get_divergence_engine_status` |
+
+Lifecycle controls such as `start_divergence_engine` remain direct API/CLI operations and are intentionally excluded from MCP tools.
 
 ---
 

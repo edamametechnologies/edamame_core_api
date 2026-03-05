@@ -355,7 +355,7 @@ See [EVENTS.md](EVENTS.md) for the complete event reference.
 | `AgenticEscalated` | 34359738368 | AI action escalated for review |
 | `DomainLimitReached` | 68719476736 | Domain device limit reached |
 | `AgenticStatusUpdated` | 137438953472 | AI subscription/status changed |
-| `SubscriptionLimitReached` | 274877906944 | Subscription usage limit reached |
+| `LimitReached` | 274877906944 | Subscription usage limit reached |
 
 ### Event Broadcasting
 
@@ -450,15 +450,40 @@ EDAMAME Core includes an MCP (Model Context Protocol) server, enabling external 
 
 ### MCP Tools Exposed
 
-| Tool | Description |
-|------|-------------|
-| `advisor_get_todos` | Get all security recommendations |
-| `advisor_get_action_history` | Audit trail of AI actions |
-| `advisor_undo_action` | Rollback a specific action |
-| `advisor_undo_all_actions` | Rollback all actions |
-| `agentic_process_todos` | AI-powered "Do It For Me" workflow |
-| `agentic_execute_action` | Execute a pending action |
-| `agentic_get_workflow_status` | Get current workflow progress |
+EDAMAME currently exposes **24 MCP tools**:
+
+| Category | Tool | Description |
+|----------|------|-------------|
+| Advisor | `advisor_get_todos` | Get prioritized security todos |
+| Advisor | `advisor_get_action_history` | Audit trail of AI actions |
+| Advisor | `advisor_undo_action` | Roll back a specific action |
+| Advisor | `advisor_undo_all_actions` | Roll back all actions (panic button) |
+| Observation | `get_sessions` | Get observed network sessions |
+| Observation | `get_anomalous_sessions` | Get statistically anomalous sessions |
+| Observation | `get_blacklisted_sessions` | Get sessions to known-malicious destinations |
+| Observation | `get_exceptions` | Get whitelist/policy exception sessions |
+| Observation | `get_lan_devices` | Get discovered LAN devices |
+| Observation | `get_lan_host_device` | Get this host's LAN-discovered profile |
+| Observation | `get_breaches` | Get HIBP breach data |
+| Identity | `add_pwned_email` | Add email to breach monitoring |
+| Identity | `remove_pwned_email` | Remove email from breach monitoring |
+| Identity | `get_pwned_emails` | List monitored emails and breach counts |
+| Configuration | `set_lan_auto_scan` | Enable/disable continuous LAN auto-scan |
+| Posture | `get_score` | Get trimmed/full security posture score |
+| Agentic | `agentic_process_todos` | AI-powered todo triage/execution |
+| Agentic | `agentic_execute_action` | Execute pending action |
+| Agentic | `agentic_get_workflow_status` | Get current workflow progress |
+| Divergence | `upsert_behavioral_model` | Push reasoning-plane behavioral model |
+| Divergence | `get_behavioral_model` | Read stored behavioral model |
+| Divergence | `get_divergence_verdict` | Get latest divergence verdict |
+| Divergence | `get_divergence_history` | Get rolling divergence verdict history |
+| Divergence | `get_divergence_engine_status` | Get divergence engine status |
+
+> Note: divergence lifecycle control (`start_divergence_engine`) is a direct RPC/CLI control plane method and is intentionally **not** exposed via MCP tools.
+
+Behavioral-model payloads use the v3 schema:
+- expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
+- negative dimensions: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
 
 ### MCP API Methods
 
@@ -678,7 +703,7 @@ Security recommendations and AI-enriched advice.
 | `get_advisor_remediation` | question: String | String | AI advice for question |
 | `request_advisor_report` | email: String | void | Email advisor report |
 
-### Agentic / AI Automation (30 methods)
+### Agentic / AI Automation (37 methods)
 
 AI-powered security automation with multiple LLM providers.
 
@@ -714,6 +739,13 @@ AI-powered security automation with multiple LLM providers.
 | `oauth_signout_internal` | -- | String | Sign out |
 | `oauth_get_status` | -- | OAuthStatusAPI | OAuth authentication status |
 | `oauth_open_signup` | -- | bool | Open sign-up page |
+| `upsert_behavioral_model` | window_json: String | String | Upsert behavioral model for two-plane correlation |
+| `get_behavioral_model` | -- | String | Get current behavioral model |
+| `get_divergence_verdict` | -- | String | Get latest divergence verdict |
+| `get_divergence_history` | limit: usize | String | Get divergence verdict history |
+| `clear_behavioral_model` | -- | void | Clear behavioral model (testing/debug) |
+| `start_divergence_engine` | enabled: bool, interval_secs: u64 | String | Start/stop divergence engine (control plane) |
+| `get_divergence_engine_status` | -- | String | Get divergence engine runtime status |
 
 ### MCP Server (3 methods)
 

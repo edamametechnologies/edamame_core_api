@@ -144,7 +144,10 @@ self.state.read().await.event_manager.trigger_event(CoreEvent::ScoreCompleted);
 | `AgenticConfirmed` | 17179869184 | An AI action was confirmed by the user |
 | `AgenticEscalated` | 34359738368 | An AI action was escalated for human review |
 | `AgenticStatusUpdated` | 137438953472 | AI subscription/configuration status changed |
-| `SubscriptionLimitReached` | 274877906944 | Subscription usage limit reached |
+| `LimitReached` | 274877906944 | Subscription usage limit reached |
+| `BehavioralModelUpdated` | 1099511627776 | Fired when the cortex extrapolator pushes a new behavioral model |
+| `DivergenceDetected` | 2199023255552 | Fired when the divergence verdict is DIVERGENCE |
+| `DivergenceClean` | 4398046511104 | Fired when verdict returns to CLEAN after a previous DIVERGENCE |
 
 ## Event Mask Examples
 
