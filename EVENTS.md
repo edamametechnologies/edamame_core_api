@@ -74,6 +74,14 @@ self.state.read().await.event_manager.trigger_event(CoreEvent::ScoreCompleted);
 |-------|-------|-------------|
 | `AppOutdated` | 1 | Current application version is outdated; update available |
 
+### Health Events
+
+| Event | Value | Description |
+|-------|-------|-------------|
+| `HealthChanged` | 128 | Health-monitoring state changed |
+| `HealthCompleted` | 256 | Health-monitoring run completed |
+| `HealthStarted` | 512 | Health-monitoring run started |
+
 ### Score Events
 
 | Event | Value | Description |
@@ -99,9 +107,11 @@ self.state.read().await.event_manager.trigger_event(CoreEvent::ScoreCompleted);
 | `LANScanStarted` | 8192 | LAN scan started |
 | `LANScanUpdated` | 524288 | LAN scan results updated incrementally |
 | `NetworkChanged` | 32768 | Network configuration changed (interface, SSID, gateway) |
+| `ConnectivityChanged` | 549755813888 | Internet connectivity state changed |
 | `SessionsUpdated` | 536870912 | Network sessions updated |
 | `AnomalousSessionsAdded` | 1073741824 | ML-detected anomalous sessions found |
 | `BlacklistedSessionsAdded` | 2147483648 | Blacklisted sessions detected |
+| `L7TagsUpdated` | 8796093022208 | Layer-7 enrichment tags changed |
 
 ### Breach Events
 
@@ -148,6 +158,7 @@ self.state.read().await.event_manager.trigger_event(CoreEvent::ScoreCompleted);
 | `BehavioralModelUpdated` | 1099511627776 | Fired when the cortex extrapolator pushes a new behavioral model |
 | `DivergenceDetected` | 2199023255552 | Fired when the divergence verdict is DIVERGENCE |
 | `DivergenceClean` | 4398046511104 | Fired when verdict returns to CLEAN after a previous DIVERGENCE |
+| `DivergenceUpdated` | 17592186044416 | Fired when live divergence or vulnerability-monitor state changes |
 
 ## Event Mask Examples
 

@@ -17,8 +17,9 @@ Complete reference for all MCP (Model Context Protocol) tools exposed by EDAMAME
 4. [LAN Scan Configuration Tools](#lan-scan-configuration-tools)
 5. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
 6. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
-7. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
-8. [Server Management](#server-management)
+7. [Vulnerability Detection Tools](#vulnerability-detection-tools)
+8. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
+9. [Server Management](#server-management)
 
 ---
 
@@ -70,7 +71,12 @@ Undo ALL AI actions from current session (last 30 days). Rolls back all threat r
 
 Get all observed network sessions with full metadata: source/destination IPs, ports, domains, ASN info, L7 protocol, anomaly status, and process attribution. Each session includes deep L7 enrichment fields (see [L7 Session Enrichment Fields](#l7-session-enrichment-fields)). Use this to detect unexpected outbound traffic that diverges from declared agent intent.
 
-**Parameters**: None
+**Parameters**:
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `active_only` | boolean | true | If true, return only sessions with recent activity; if false, include inactive/stale sessions |
+| `limit` | integer | 200 | Maximum number of sessions to return |
 
 ---
 
@@ -229,8 +235,36 @@ Push a reasoning-plane behavioral model for two-plane correlation. The divergenc
 | `window_json` | string | Yes | JSON behavioral model (v3 schema) |
 
 **V3 Schema Dimensions**:
-- Expected: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
-- Negative: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
+- Expected: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_grandparent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
+- Negative: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_grandparent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
+
+**Scope filters** (per-prediction, restrict which sessions are in scope):
+- `scope_process_paths` -- match session's own `process_path` or `cmd[0]`
+- `scope_parent_paths` -- match parent's `parent_process_path`, `parent_script_path`, or `parent_cmd[0]`
+- `scope_grandparent_paths` -- match grandparent's `grandparent_process_path`, `grandparent_script_path`, or `grandparent_cmd[0]`
+- `scope_any_lineage_paths` -- match any of process, parent, or grandparent
+
+Rules use glob-style wildcards (`*` matches any substring). A session matches if any populated scope level matches.
+
+**Expected traffic syntax** (`expected_traffic` array):
+- **Domain-suffix**: `host:port` (e.g. `amazonaws.com:443`) -- matches destinations whose host ends with the domain (e.g. `ec2-xxx.compute-1.amazonaws.com:443`). No glob expansion.
+- **ASN-based**: `asn:OWNER_SUBSTRING` (e.g. `asn:CLOUDFLARENET`) -- matches destinations whose ASN owner (from IP-to-ASN DB) contains the substring (case-insensitive). Use for CDN providers (Cloudflare, Akamai) whose IPs lack predictable domain suffixes.
+
+Common ASN patterns: `asn:CLOUDFLARENET`, `asn:AMAZON`, `asn:AKAMAI`, `asn:FASTLY`, `asn:GOOGLE`, `asn:MICROSOFT`, `asn:NOTION`.
+
+---
+
+### `upsert_behavioral_model_from_raw_sessions`
+
+Push raw reasoning-plane sessions and let EDAMAME use its configured internal LLM provider to generate and upsert the behavioral model slice. Used by thin transcript bridges (e.g. Cursor extrapolator) that forward session metadata without running their own LLM.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `raw_sessions_json` | string | Yes | JSON-encoded `RawReasoningSessionPayload` with `agent_type`, `agent_instance_id`, `window_start`, `window_end`, and `sessions` array |
+
+**Payload schema**: Each session in `sessions` must have `session_key`, `started_at`, `modified_at` (RFC 3339), optional `messages`, `derived_expected_traffic`, `tools_called`. The internal LLM produces `SessionPrediction` entries with scope filters and `expected_traffic` (including ASN patterns when appropriate).
 
 ---
 
@@ -268,7 +302,71 @@ Get the divergence engine runtime status: whether it is running, the configured 
 
 **Parameters**: None
 
+### `dismiss_divergence_evidence`
+
+Dismiss a divergence evidence group by its stable `finding_key`. Acknowledges a known-benign behavioral mismatch without deleting the evidence. Reversible via `undismiss_divergence_evidence`.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `finding_key` | string | Yes | Stable key from the evidence (e.g. `divergence:ec61e11fae833735d8f6c84659f4127ab1956ab297f705a6da691c4e898f8653`) |
+
+### `undismiss_divergence_evidence`
+
+Restore a previously dismissed divergence evidence group by its stable `finding_key`.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `finding_key` | string | Yes | Stable key of the dismissed evidence |
+
+### `clear_divergence_state`
+
+Clear the current behavioral model, divergence verdict history, and divergence-engine runtime state. Use in tests or controlled resets before pushing a new model window. **SIDE EFFECTS.**
+
+**Parameters**: None
+
 > Note: divergence lifecycle control (`start_divergence_engine`) is a direct RPC/CLI control plane method and is intentionally **not** exposed via MCP tools.
+
+---
+
+## Vulnerability Detection Tools
+
+Model-independent heuristic checks (CVE-aligned). Run on their own cadence, independent of the behavioral divergence engine.
+
+### `get_vulnerability_findings`
+
+Get the latest vulnerability findings from model-independent heuristic checks. Returns timestamped report with `findings` array; each finding has `check`, `severity` (CRITICAL/HIGH/MEDIUM), `description`, `reference` (CVE IDs), `process_name`, `parent_process_name`, `destination_ip`, `open_files`, and `finding_key`.
+
+**Parameters**: None
+
+### `get_vulnerability_detector_status`
+
+Get the current status of the vulnerability detector: enabled state, evaluation interval, last run timestamp, and latest finding count.
+
+**Parameters**: None
+
+### `dismiss_vulnerability_finding`
+
+Dismiss a vulnerability finding by its stable `finding_key`. Use when a CVE-aligned heuristic finding is known/accepted.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `finding_key` | string | Yes | Stable key from the finding (e.g. `vuln:4ba5528a37997db4f405710cb1a90cc1c5605adac8beffb390c7e7ef572ab325`) |
+
+### `undismiss_vulnerability_finding`
+
+Restore a previously dismissed vulnerability finding by its stable `finding_key`.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `finding_key` | string | Yes | Stable key of the dismissed finding |
 
 ---
 
@@ -301,6 +399,16 @@ Every network session returned by `get_sessions`, `get_anomalous_sessions`, `get
 | `parent_process_path` | string | Full path to the parent process executable |
 | `parent_cmd` | array[string] | Parent process command-line arguments |
 | `parent_script_path` | string (optional) | Script path extracted from `parent_cmd` when the parent is an interpreter (bash, python, etc.). None when parent is a compiled binary. |
+
+### Grandparent Process Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `grandparent_pid` | integer (optional) | Grandparent process ID |
+| `grandparent_process_name` | string | Name of the grandparent process |
+| `grandparent_process_path` | string | Full path to the grandparent process executable |
+| `grandparent_cmd` | array[string] | Grandparent process command-line arguments |
+| `grandparent_script_path` | string (optional) | Script path extracted from `grandparent_cmd` when the grandparent is an interpreter. None when grandparent is a compiled binary. |
 
 ### Security-Relevant Fields
 

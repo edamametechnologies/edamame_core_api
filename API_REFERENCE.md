@@ -1305,13 +1305,25 @@ Configure the LLM provider. Supported providers:
 - `"openai"` -- OpenAI GPT (API key required)
 - `"ollama"` -- Local Ollama instance (base_url required)
 
+This same call also persists optional team-delivery routing for Security Agent notifications:
+- Slack bot token + separate action and escalation channels
+- Telegram bot token + destination chat ID
+
 #### agentic_get_llm_config
 
 ```
 agentic_get_llm_config() -> LLMConfigInfoAPI
 ```
 
-Returns the current LLM configuration (provider, model, base_url -- API keys are redacted).
+Returns the current LLM configuration and saved delivery-channel settings (provider, model, base_url, API key presence and value, Slack routing, Telegram routing, and Telegram interactive state).
+
+#### agentic_set_telegram_interactive_config
+
+```
+agentic_set_telegram_interactive_config(enabled: bool, allowed_user_ids: Vec<i64>) -> bool
+```
+
+Enable or disable Telegram interactive reply cards for predefined actions such as dismissing divergence evidence or vulnerability findings. Callback handling stays allowlist-based: only explicitly listed Telegram user IDs can invoke interactive actions, while the bot token and destination chat remain configured through `agentic_set_llm_config`.
 
 #### agentic_test_llm
 
@@ -1507,6 +1519,14 @@ get_behavioral_model() -> String
 
 Read the current behavioral model as JSON.
 
+#### get_behavioral_model_history
+
+```
+get_behavioral_model_history(limit: usize) -> String
+```
+
+Get recent behavioral-model injection snapshots as JSON. `limit` caps the number of entries returned.
+
 #### get_divergence_verdict
 
 ```
@@ -1524,6 +1544,22 @@ get_divergence_history(limit: usize) -> String
 
 Get rolling history of divergence verdicts as JSON. `limit` caps the number of entries returned.
 
+#### dismiss_divergence_evidence
+
+```
+dismiss_divergence_evidence(finding_key: String) -> String
+```
+
+Dismiss one divergence evidence item by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
+
+#### undismiss_divergence_evidence
+
+```
+undismiss_divergence_evidence(finding_key: String) -> String
+```
+
+Restore a previously dismissed divergence evidence item by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
+
 #### clear_behavioral_model
 
 ```
@@ -1531,6 +1567,30 @@ clear_behavioral_model() -> ()
 ```
 
 Reset the behavioral model. For testing and debugging only. Not exposed via MCP.
+
+#### clear_behavioral_model_history
+
+```
+clear_behavioral_model_history() -> ()
+```
+
+Clear stored behavioral-model injection history.
+
+#### clear_divergence_history
+
+```
+clear_divergence_history() -> ()
+```
+
+Clear stored divergence verdict history.
+
+#### clear_divergence_state
+
+```
+clear_divergence_state() -> ()
+```
+
+Clear the live divergence state, including the current verdict cache.
 
 #### start_divergence_engine
 
@@ -1551,6 +1611,66 @@ Get engine status as JSON: running state, interval, last run timestamp, model ag
 **MCP tools**: Five of these methods are exposed as MCP tools: `upsert_behavioral_model`, `get_behavioral_model`, `get_divergence_verdict`, `get_divergence_history`, and `get_divergence_engine_status`.
 
 `start_divergence_engine` and `clear_behavioral_model` are direct API control-plane methods and are not exposed via MCP tools.
+
+### Vulnerability Detector
+
+Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag.
+
+#### start_vulnerability_detector
+
+```
+start_vulnerability_detector(enabled: bool, interval_secs: u64) -> String
+```
+
+Enable or disable the vulnerability detector with optional interval configuration. Returns status JSON.
+
+#### get_vulnerability_findings
+
+```
+get_vulnerability_findings() -> String
+```
+
+Get the latest active vulnerability / safety-floor report as JSON.
+
+#### get_vulnerability_history
+
+```
+get_vulnerability_history(limit: usize) -> String
+```
+
+Get rolling history of vulnerability detector reports as JSON. `limit` caps the number of entries returned.
+
+#### dismiss_vulnerability_finding
+
+```
+dismiss_vulnerability_finding(finding_key: String) -> String
+```
+
+Dismiss one vulnerability or safety-floor finding by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
+
+#### undismiss_vulnerability_finding
+
+```
+undismiss_vulnerability_finding(finding_key: String) -> String
+```
+
+Restore a previously dismissed vulnerability or safety-floor finding by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
+
+#### clear_vulnerability_history
+
+```
+clear_vulnerability_history() -> ()
+```
+
+Clear stored vulnerability detector report history.
+
+#### get_vulnerability_detector_status
+
+```
+get_vulnerability_detector_status() -> String
+```
+
+Get detector status as JSON: running state, interval, last run timestamp, and current active-finding count.
 
 ---
 

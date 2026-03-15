@@ -314,7 +314,7 @@ Events are delivered to all registered consumers:
 - **gRPC**: Server-streaming RPC (`subscribe_to_events`)
 - **Internal**: `mpsc::Sender` channels for in-process listeners
 
-### Event Definitions (36 events, excluding health-related)
+### Event Definitions (45 events)
 
 See [EVENTS.md](EVENTS.md) for the complete event reference.
 
@@ -327,6 +327,9 @@ See [EVENTS.md](EVENTS.md) for the complete event reference.
 | `DeviceAdded` | 16 | New device discovered on network |
 | `DevicesProgress` | 32 | Device scan progress update |
 | `DevicesUpdated` | 64 | Device list changed |
+| `HealthChanged` | 128 | Health-monitoring state changed |
+| `HealthCompleted` | 256 | Health-monitoring run completed |
+| `HealthStarted` | 512 | Health-monitoring run started |
 | `HelperStateChanged` | 1024 | Privileged helper daemon state changed |
 | `LANScanCancelStarted` | 2048 | LAN scan cancellation initiated |
 | `LANScanCompleted` | 4096 | LAN scan finished |
@@ -356,6 +359,12 @@ See [EVENTS.md](EVENTS.md) for the complete event reference.
 | `DomainLimitReached` | 68719476736 | Domain device limit reached |
 | `AgenticStatusUpdated` | 137438953472 | AI subscription/status changed |
 | `LimitReached` | 274877906944 | Subscription usage limit reached |
+| `ConnectivityChanged` | 549755813888 | Internet connectivity state changed |
+| `BehavioralModelUpdated` | 1099511627776 | Behavioral model added, updated, or cleared |
+| `DivergenceDetected` | 2199023255552 | Divergence verdict transitioned to `DIVERGENCE` |
+| `DivergenceClean` | 4398046511104 | Divergence verdict returned to `CLEAN` |
+| `L7TagsUpdated` | 8796093022208 | Layer-7 enrichment tags changed |
+| `DivergenceUpdated` | 17592186044416 | Divergence or vulnerability-monitor state changed |
 
 ### Event Broadcasting
 
@@ -448,7 +457,25 @@ EDAMAME Core includes an MCP (Model Context Protocol) server, enabling external 
 | Bind address | 127.0.0.1 | `listen_all_interfaces` for remote access |
 | Authentication | PSK (Pre-Shared Key) | Bearer token, minimum 32 characters |
 
-### MCP Tools Exposed (24 tools)
+#### PSK Credential File
+
+MCP clients authenticate using `Authorization: Bearer <PSK>`. The PSK can be
+provided via the `EDAMAME_MCP_PSK` environment variable or stored in `~/.edamame_psk`.
+The file must be **owner-read/write only** (`chmod 600`):
+
+```bash
+echo "<your-psk>" > ~/.edamame_psk
+chmod 600 ~/.edamame_psk
+```
+
+For `edamame_posture`, generate a PSK with:
+```bash
+edamame_posture background-mcp-generate-psk
+```
+
+For the EDAMAME Security desktop app, set the PSK under AI tab > MCP Server Settings.
+
+### MCP Tools Exposed (32 tools)
 
 See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, return types, and L7 session field documentation.
 
@@ -458,7 +485,7 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 2 | `advisor_get_action_history` | Advisor | AI action audit trail |
 | 3 | `advisor_undo_action` | Advisor | Rollback specific action |
 | 4 | `advisor_undo_all_actions` | Advisor | Rollback all actions |
-| 5 | `get_sessions` | Observation | All sessions with L7 enrichment |
+| 5 | `get_sessions` | Observation | All sessions with L7 enrichment (`active_only`, `limit`) |
 | 6 | `get_anomalous_sessions` | Observation | ML-flagged anomalous sessions |
 | 7 | `get_blacklisted_sessions` | Observation | Sessions to known-bad destinations |
 | 8 | `get_exceptions` | Observation | Whitelist/policy violations |
@@ -474,16 +501,26 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 18 | `agentic_execute_action` | Agentic | Execute pending action |
 | 19 | `agentic_get_workflow_status` | Agentic | Workflow progress |
 | 20 | `upsert_behavioral_model` | Divergence | Push reasoning-plane behavioral model |
-| 21 | `get_behavioral_model` | Divergence | Read stored behavioral model |
-| 22 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
-| 23 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
-| 24 | `get_divergence_engine_status` | Divergence | Divergence engine status |
+| 21 | `upsert_behavioral_model_from_raw_sessions` | Divergence | Push raw sessions, EDAMAME LLM generates model |
+| 22 | `get_behavioral_model` | Divergence | Read stored behavioral model |
+| 23 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
+| 24 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
+| 25 | `get_divergence_engine_status` | Divergence | Divergence engine status |
+| 26 | `dismiss_divergence_evidence` | Divergence | Dismiss evidence by `finding_key` |
+| 27 | `undismiss_divergence_evidence` | Divergence | Restore dismissed evidence |
+| 28 | `clear_divergence_state` | Divergence | Clear model, verdict history, engine state |
+| 29 | `get_vulnerability_findings` | Vulnerability | CVE-aligned heuristic findings |
+| 30 | `get_vulnerability_detector_status` | Vulnerability | Detector runtime status |
+| 31 | `dismiss_vulnerability_finding` | Vulnerability | Dismiss finding by `finding_key` |
+| 32 | `undismiss_vulnerability_finding` | Vulnerability | Restore dismissed finding |
 
 > Note: divergence lifecycle control (`start_divergence_engine`) is a direct RPC/CLI control plane method and is intentionally **not** exposed via MCP tools.
 
 Behavioral-model payloads use the v3 schema:
-- expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
-- negative dimensions: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
+- expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_grandparent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
+- negative dimensions: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_grandparent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
+- scope filters: `scope_process_paths`, `scope_parent_paths`, `scope_grandparent_paths`, `scope_any_lineage_paths`
+- expected traffic: domain-suffix (`host:port`) or ASN (`asn:OWNER_SUBSTRING`)
 
 ### MCP API Methods
 
@@ -659,9 +696,9 @@ LAN scanning, packet capture, session analysis, whitelists/blacklists, and anoma
 
 Every session returned by `get_sessions` and related methods includes deep L7 process attribution fields. See [MCP.md](MCP.md#l7-session-enrichment-fields) for the complete field reference.
 
-Key fields: `pid`, `process_name`, `process_path`, `cmd`, `cwd`, `parent_pid`, `parent_process_name`, `parent_process_path`, `parent_cmd`, `parent_script_path`, `spawned_from_tmp`, `open_files`, `memory`, `cpu_usage`, `disk_usage`.
+Key fields: `pid`, `process_name`, `process_path`, `cmd`, `cwd`, `parent_pid`, `parent_process_name`, `parent_process_path`, `parent_cmd`, `parent_script_path`, `grandparent_pid`, `grandparent_process_name`, `grandparent_process_path`, `grandparent_cmd`, `grandparent_script_path`, `spawned_from_tmp`, `open_files`, `memory`, `cpu_usage`, `disk_usage`.
 
-- **Parent process lineage**: Full parent chain for detecting script-based and interpreter-wrapped attacks
+- **Process lineage**: Full parent and grandparent chain for detecting script-based and interpreter-wrapped attacks
 - **Sensitive file detection**: SSH keys, credentials, keychains tracked in `open_files` (sticky across refresh cycles)
 - **Temp-origin detection**: `spawned_from_tmp` flags processes originating from `/tmp/`, `/var/tmp/`, `/dev/shm/`
 - **Refresh cycles**: Full L7 refresh every 5 minutes; sensitive files re-scanned every 30s (Linux), 60s (macOS), 120s (Windows)
@@ -714,7 +751,7 @@ Security recommendations and AI-enriched advice.
 | `get_advisor_remediation` | question: String | String | AI advice for question |
 | `request_advisor_report` | email: String | void | Email advisor report |
 
-### Agentic / AI Automation (37 methods)
+### Agentic / AI Automation (51 methods)
 
 AI-powered security automation with multiple LLM providers.
 
@@ -730,7 +767,8 @@ AI-powered security automation with multiple LLM providers.
 | `agentic_set_auto_processing` | enabled, interval_secs, mode | bool | Configure auto-processing |
 | `agentic_get_auto_processing_status` | -- | AgenticAutoProcessingStatusAPI | Auto-processing config |
 | `agentic_set_llm_config` | provider, api_key, model, ... | bool | Configure LLM provider |
-| `agentic_get_llm_config` | -- | LLMConfigInfoAPI | Current LLM config |
+| `agentic_get_llm_config` | -- | LLMConfigInfoAPI | Current LLM and delivery config |
+| `agentic_set_telegram_interactive_config` | enabled: bool, allowed_user_ids: Vec\<i64\> | bool | Configure Telegram predefined interactive replies |
 | `agentic_test_llm` | -- | LLMTestResultAPI | Test LLM connectivity |
 | `agentic_get_workflow_status` | -- | Option\<AgenticWorkflowStatusAPI\> | Current workflow state |
 | `agentic_get_status` | -- | AgenticStatusAPI | Overall agentic status |
@@ -752,11 +790,24 @@ AI-powered security automation with multiple LLM providers.
 | `oauth_open_signup` | -- | bool | Open sign-up page |
 | `upsert_behavioral_model` | window_json: String | String | Upsert behavioral model for two-plane correlation |
 | `get_behavioral_model` | -- | String | Get current behavioral model |
+| `get_behavioral_model_history` | limit: usize | String | Get behavioral-model injection history |
 | `get_divergence_verdict` | -- | String | Get latest divergence verdict |
 | `get_divergence_history` | limit: usize | String | Get divergence verdict history |
+| `dismiss_divergence_evidence` | finding_key: String | String | Dismiss divergence evidence item |
+| `undismiss_divergence_evidence` | finding_key: String | String | Restore dismissed divergence evidence item |
 | `clear_behavioral_model` | -- | void | Clear behavioral model (testing/debug) |
+| `clear_behavioral_model_history` | -- | void | Clear behavioral-model injection history |
+| `clear_divergence_history` | -- | void | Clear divergence verdict history |
+| `clear_divergence_state` | -- | void | Clear live divergence state |
 | `start_divergence_engine` | enabled: bool, interval_secs: u64 | String | Start/stop divergence engine (control plane) |
 | `get_divergence_engine_status` | -- | String | Get divergence engine runtime status |
+| `start_vulnerability_detector` | enabled: bool, interval_secs: u64 | String | Start/stop vulnerability detector |
+| `get_vulnerability_findings` | -- | String | Get latest vulnerability/safety-floor report |
+| `get_vulnerability_history` | limit: usize | String | Get vulnerability detector history |
+| `dismiss_vulnerability_finding` | finding_key: String | String | Dismiss vulnerability finding |
+| `undismiss_vulnerability_finding` | finding_key: String | String | Restore dismissed vulnerability finding |
+| `clear_vulnerability_history` | -- | void | Clear vulnerability detector history |
+| `get_vulnerability_detector_status` | -- | String | Get vulnerability detector runtime status |
 
 ### MCP Server (3 methods)
 
