@@ -455,25 +455,22 @@ EDAMAME Core includes an MCP (Model Context Protocol) server, enabling external 
 | Transport | Streamable HTTP | rmcp SDK v0.8 |
 | Port | 3000 | Configurable |
 | Bind address | 127.0.0.1 | `listen_all_interfaces` for remote access |
-| Authentication | PSK (Pre-Shared Key) | Bearer token, minimum 32 characters |
+| Authentication | Dual-mode | Per-client credentials or shared PSK |
 
-#### PSK Credential File
+#### Dual-Mode Authentication
 
-MCP clients authenticate using `Authorization: Bearer <PSK>`. The PSK can be
-provided via the `EDAMAME_MCP_PSK` environment variable or stored in `~/.edamame_psk`.
-The file must be **owner-read/write only** (`chmod 600`):
+The MCP server supports two authentication modes:
 
-```bash
-echo "<your-psk>" > ~/.edamame_psk
-chmod 600 ~/.edamame_psk
-```
+1. **Per-client credentials** (app-mediated pairing): Desktop clients POST to the unauthenticated `/mcp/pair` endpoint with client metadata. The user approves the request in the host app UI. The client receives an `edm_mcp_...` credential and uses it as `Authorization: Bearer edm_mcp_...`. See [MCP.md](MCP.md#pairing-endpoints) for pairing endpoint details.
+
+2. **Shared PSK** (CLI/headless): A legacy Bearer token passed at server start. Used by CLI tools, provisioning scripts, and automation. The PSK can be provided via the `EDAMAME_MCP_PSK` environment variable or stored in `~/.edamame_psk` (owner-read/write only, `chmod 600`).
 
 For `edamame_posture`, generate a PSK with:
 ```bash
 edamame_posture background-mcp-generate-psk
 ```
 
-For the EDAMAME Security desktop app, set the PSK under AI tab > MCP Server Settings.
+For the EDAMAME Security desktop app, configure credentials under AI tab > MCP Server Settings (pairing UI or shared PSK).
 
 ### MCP Tools Exposed (32 tools)
 
@@ -528,6 +525,12 @@ Behavioral-model payloads use the v3 schema:
 mcp_start_server(port, psk, enable_cors, listen_all_interfaces) -> String
 mcp_stop_server() -> String
 mcp_get_server_status() -> String
+mcpApprovePairing(request_id: String) -> String
+mcpRejectPairing(request_id: String) -> String
+mcpListPairedClients() -> String
+mcpGetPendingPairingRequests() -> String
+mcpRevokePairedClient(client_id: String) -> String
+mcpRotatePairedClient(client_id: String) -> String
 ```
 
 > PSK generation is available via the Posture CLI: `edamame-posture mcp-generate-psk`
@@ -586,12 +589,12 @@ Used by Claude Desktop, n8n, or custom AI agents.
 ```
 AI Agent (Claude Desktop / n8n / custom)
     |-- Streamable HTTP (localhost:3000)
-    |-- PSK Bearer token authentication
+    |-- Bearer token authentication (per-client credential or shared PSK)
     |-- Tool calls: advisor_get_todos, agentic_process_todos, etc.
     |-- Human-in-the-loop: agents escalate risky actions
 ```
 
-Configuration: Start MCP server via `mcp_start_server()` API call or `edamame-posture mcp-start`
+Configuration: Start MCP server via `mcp_start_server()` API call or `edamame-posture mcp-start`. Use app-mediated pairing for per-client credentials, or shared PSK for CLI/headless.
 
 ---
 
@@ -809,15 +812,21 @@ AI-powered security automation with multiple LLM providers.
 | `clear_vulnerability_history` | -- | void | Clear vulnerability detector history |
 | `get_vulnerability_detector_status` | -- | String | Get vulnerability detector runtime status |
 
-### MCP Server (3 methods)
+### MCP Server (9 methods)
 
-MCP server management (feature-gated: `mcp`).
+MCP server management and pairing (feature-gated: `mcp`).
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
 | `mcp_start_server` | port, psk, enable_cors, listen_all_interfaces | String | Start MCP server |
 | `mcp_stop_server` | -- | String | Stop MCP server |
 | `mcp_get_server_status` | -- | String | Server running status |
+| `mcpApprovePairing` | request_id: String | String | Approve a pending pairing request |
+| `mcpRejectPairing` | request_id: String | String | Reject a pending pairing request |
+| `mcpListPairedClients` | -- | String | List all paired clients (JSON array) |
+| `mcpGetPendingPairingRequests` | -- | String | List pending pairing requests (JSON array) |
+| `mcpRevokePairedClient` | client_id: String | String | Revoke a paired client |
+| `mcpRotatePairedClient` | client_id: String | String | Rotate a client's credential |
 
 > **Note**: PSK generation (`mcp_generate_psk`) is provided by the [EDAMAME Posture CLI](https://github.com/edamametechnologies/edamame_posture_cli), not by EDAMAME Core directly.
 

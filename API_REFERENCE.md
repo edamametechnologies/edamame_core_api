@@ -1676,7 +1676,7 @@ Get detector status as JSON: running state, interval, last run timestamp, and cu
 
 ## MCP Server
 
-Model Context Protocol server management. Requires the `mcp` feature flag (which implies `agentic`).
+Model Context Protocol server management and pairing. Requires the `mcp` feature flag (which implies `agentic`).
 
 **Source**: `api/api_agentic.rs` (MCP section)
 
@@ -1686,7 +1686,7 @@ Model Context Protocol server management. Requires the `mcp` feature flag (which
 mcp_start_server(port: u16, psk: String, enable_cors: bool, listen_all_interfaces: bool) -> String
 ```
 
-Start the MCP server. PSK must be at least 32 characters.
+Start the MCP server. PSK must be at least 32 characters when using shared PSK mode.
 
 ### mcp_stop_server
 
@@ -1703,6 +1703,54 @@ mcp_get_server_status() -> String
 ```
 
 Returns the MCP server status (running/stopped, port, etc.).
+
+### mcpApprovePairing
+
+```
+mcpApprovePairing(request_id: String) -> String
+```
+
+Approve a pending pairing request. The client receives its credential when polling `GET /mcp/pair/:request_id`. Called by the host app when the user approves in the pairing UI.
+
+### mcpRejectPairing
+
+```
+mcpRejectPairing(request_id: String) -> String
+```
+
+Reject a pending pairing request. Called by the host app when the user rejects in the pairing UI.
+
+### mcpListPairedClients
+
+```
+mcpListPairedClients() -> String
+```
+
+Returns a JSON array of all paired clients with their metadata (client_id, client_name, agent_type, agent_instance_id, created_at, etc.).
+
+### mcpGetPendingPairingRequests
+
+```
+mcpGetPendingPairingRequests() -> String
+```
+
+Returns a JSON array of pending pairing requests awaiting user approval (request_id, client_name, agent_type, agent_instance_id, requested_endpoint, workspace_hint, created_at, etc.).
+
+### mcpRevokePairedClient
+
+```
+mcpRevokePairedClient(client_id: String) -> String
+```
+
+Revoke a paired client. The client's credential is invalidated and the client can no longer connect.
+
+### mcpRotatePairedClient
+
+```
+mcpRotatePairedClient(client_id: String) -> String
+```
+
+Rotate a paired client's credential. Returns the new credential. The old credential is invalidated.
 
 ### MCP Tool Surface (24 tools)
 

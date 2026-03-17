@@ -5,21 +5,73 @@ Complete reference for all MCP (Model Context Protocol) tools exposed by EDAMAME
 **Server**: Streamable HTTP transport via [rmcp](https://github.com/nicholaskell/rmcp) SDK v0.8
 **Protocol**: MCP 2024-11-05
 **Default endpoint**: `http://127.0.0.1:3000/mcp`
-**Authentication**: PSK (Pre-Shared Key) via `Authorization: Bearer <psk>` header
+**Authentication**: Dual-mode (per-client credentials or shared PSK) via `Authorization: Bearer <token>` header
+
+---
+
+## Authentication
+
+The MCP server supports two authentication modes:
+
+### 1. Per-Client Credentials (App-Mediated Pairing)
+
+Desktop clients obtain a unique credential through the host app's pairing flow:
+
+1. Client POSTs to the unauthenticated `/mcp/pair` endpoint with client metadata.
+2. User approves the request in the host app UI.
+3. Client polls `GET /mcp/pair/:request_id` until status is `approved`.
+4. Client receives an `edm_mcp_...` credential and uses it as `Authorization: Bearer edm_mcp_...`. Each credential is scoped to a single client.
+
+### 2. Shared PSK (CLI/Headless)
+
+A legacy Bearer token passed at server start. Used by CLI tools, provisioning scripts, and automation. The PSK can be provided via the `EDAMAME_MCP_PSK` environment variable or stored in `~/.edamame_psk` (owner-read/write only, `chmod 600`). Generate with `edamame-posture mcp-generate-psk`.
+
+---
+
+## Pairing Endpoints
+
+These HTTP endpoints are unauthenticated and used for the app-mediated pairing flow.
+
+### POST /mcp/pair
+
+Submit a pairing request. Request body (JSON):
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `client_name` | string | Yes | Human-readable client identifier |
+| `agent_type` | string | No | Agent type (e.g. `cursor`, `openclaw`) |
+| `agent_instance_id` | string | No | Stable instance identifier |
+| `requested_endpoint` | string | No | MCP endpoint the client will connect to |
+| `workspace_hint` | string | No | Workspace or project hint for context |
+
+**Response**: JSON with `request_id` (string). Use this ID to poll the pairing status.
+
+### GET /mcp/pair/:request_id
+
+Poll pairing status. Returns JSON with `status` and optional `credential`:
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Awaiting user approval in the host app |
+| `approved` | Approved; response includes `credential` (e.g. `edm_mcp_...`) |
+| `rejected` | User rejected the request |
+| `expired` | Request timed out or was invalidated |
 
 ---
 
 ## Table of Contents
 
-1. [Advisor Tools](#advisor-tools)
-2. [Observation Tools -- System Plane Telemetry](#observation-tools----system-plane-telemetry)
-3. [Identity / HIBP Management Tools](#identity--hibp-management-tools)
-4. [LAN Scan Configuration Tools](#lan-scan-configuration-tools)
-5. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
-6. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
-7. [Vulnerability Detection Tools](#vulnerability-detection-tools)
-8. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
-9. [Server Management](#server-management)
+1. [Authentication](#authentication)
+2. [Pairing Endpoints](#pairing-endpoints)
+3. [Advisor Tools](#advisor-tools)
+4. [Observation Tools -- System Plane Telemetry](#observation-tools----system-plane-telemetry)
+5. [Identity / HIBP Management Tools](#identity--hibp-management-tools)
+6. [LAN Scan Configuration Tools](#lan-scan-configuration-tools)
+7. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
+8. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
+9. [Vulnerability Detection Tools](#vulnerability-detection-tools)
+10. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
+11. [Server Management](#server-management)
 
 ---
 
@@ -436,13 +488,19 @@ Every network session returned by `get_sessions`, `get_anomalous_sessions`, `get
 
 ## Server Management
 
-The MCP server is managed via three API methods (also available as CLI commands via `edamame-posture`):
+The MCP server is managed via API methods (also available as CLI commands via `edamame-posture`):
 
 | API Method | CLI Command | Description |
 |------------|-------------|-------------|
 | `mcp_start_server(port, psk, enable_cors, listen_all_interfaces)` | `edamame-posture mcp-start [--port PORT] [--all-interfaces] [--enable-cors]` | Start MCP server |
 | `mcp_stop_server()` | `edamame-posture mcp-stop` | Stop MCP server |
 | `mcp_get_server_status()` | `edamame-posture mcp-status` | Check server status |
+| `mcpApprovePairing(request_id)` | (host app only) | Approve a pending pairing request |
+| `mcpRejectPairing(request_id)` | (host app only) | Reject a pending pairing request |
+| `mcpListPairedClients()` | (host app only) | List all paired clients (JSON array) |
+| `mcpGetPendingPairingRequests()` | (host app only) | List pending pairing requests (JSON array) |
+| `mcpRevokePairedClient(client_id)` | (host app only) | Revoke a paired client |
+| `mcpRotatePairedClient(client_id)` | (host app only) | Rotate a client's credential |
 
 PSK generation: `edamame-posture mcp-generate-psk`
 
@@ -470,6 +528,8 @@ npx @modelcontextprotocol/inspector --server-url http://127.0.0.1:3000/mcp --tra
 
 ### Claude Desktop Configuration
 
+Use a per-client credential (from pairing) or shared PSK:
+
 ```json
 {
   "mcpServers": {
@@ -479,12 +539,14 @@ npx @modelcontextprotocol/inspector --server-url http://127.0.0.1:3000/mcp --tra
         "mcp-remote",
         "http://127.0.0.1:3000/mcp",
         "--header",
-        "Authorization: Bearer <YOUR_PSK>"
+        "Authorization: Bearer <YOUR_CREDENTIAL>"
       ]
     }
   }
 }
 ```
+
+`<YOUR_CREDENTIAL>` is either an `edm_mcp_...` token from pairing or a shared PSK.
 
 ---
 
