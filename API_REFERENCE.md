@@ -318,7 +318,7 @@ Check whether the current security posture meets a policy. Returns true if: scor
 get_tag_prefixes() -> Vec<String>
 ```
 
-Returns all available threat tag prefixes (e.g., "SOC-2", "CIS", "ISO-27001", "PCI-DSS", "HIPAA").
+Returns all available threat tag prefixes (e.g., "SOC 2", "CIS", "ISO-27001", "PCI-DSS", "HIPAA").
 
 ### remediate
 
