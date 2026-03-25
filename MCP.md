@@ -386,11 +386,17 @@ Clear the current behavioral model, divergence verdict history, and divergence-e
 
 ## Vulnerability Detection Tools
 
-Model-independent heuristic checks (CVE-aligned). Run on their own cadence, independent of the behavioral divergence engine.
+Model-independent heuristic checks (CVE-aligned). Run on their own cadence, independent of the behavioral divergence engine. Five checks:
+
+1. **token_exfiltration** (HIGH) -- anomalous session + sensitive credential files open
+2. **skill_supply_chain** (HIGH) -- blacklisted IP session + sensitive credential files open
+3. **credential_harvest** (CRITICAL) -- any session with sensitive files spanning >= N distinct label categories (default 3; configurable via `credential_harvest_min_labels` in `cve-detection-params-db.json`)
+4. **sandbox_exploitation** (HIGH) -- suspicious parent process lineage (e.g. `/tmp/`)
+5. **gateway_binding** -- exposed listeners on the host
 
 ### `get_vulnerability_findings`
 
-Get the latest vulnerability findings from model-independent heuristic checks. Returns timestamped report with `findings` array; each finding has `check`, `severity` (CRITICAL/HIGH/MEDIUM), `description`, `reference` (CVE IDs), `process_name`, `parent_process_name`, `destination_ip`, `open_files`, and `finding_key`.
+Get the latest vulnerability findings from model-independent heuristic checks. Returns timestamped report with `findings` array; each finding has `check`, `severity` (CRITICAL/HIGH/MEDIUM), `description`, `reference` (CVE IDs or incident ref), `process_name`, `parent_process_name`, `destination_ip`, `open_files`, and `finding_key`.
 
 **Parameters**: None
 

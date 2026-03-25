@@ -1614,7 +1614,7 @@ Get engine status as JSON: running state, interval, last run timestamp, model ag
 
 ### Vulnerability Detector
 
-Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag.
+Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag. Five checks: token_exfiltration (anomalous + creds), skill_supply_chain (blacklisted + creds), credential_harvest (any session + >= N credential label categories), sandbox_exploitation (suspicious lineage), gateway_binding (exposed listeners). The `credential_harvest` threshold is configurable via `credential_harvest_min_labels` in `cve-detection-params-db.json` (default 3).
 
 #### start_vulnerability_detector
 

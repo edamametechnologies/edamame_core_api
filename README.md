@@ -506,7 +506,7 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 26 | `dismiss_divergence_evidence` | Divergence | Dismiss evidence by `finding_key` |
 | 27 | `undismiss_divergence_evidence` | Divergence | Restore dismissed evidence |
 | 28 | `clear_divergence_state` | Divergence | Clear model, verdict history, engine state |
-| 29 | `get_vulnerability_findings` | Vulnerability | CVE-aligned heuristic findings |
+| 29 | `get_vulnerability_findings` | Vulnerability | CVE-aligned heuristic findings (5 checks: token_exfiltration, skill_supply_chain, credential_harvest, sandbox_exploitation, gateway_binding) |
 | 30 | `get_vulnerability_detector_status` | Vulnerability | Detector runtime status |
 | 31 | `dismiss_vulnerability_finding` | Vulnerability | Dismiss finding by `finding_key` |
 | 32 | `undismiss_vulnerability_finding` | Vulnerability | Restore dismissed finding |
