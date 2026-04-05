@@ -380,7 +380,7 @@ Clear the current behavioral model, divergence verdict history, and divergence-e
 
 **Parameters**: None
 
-> Note: divergence lifecycle control (`start_divergence_engine`) is a direct RPC/CLI control plane method and is intentionally **not** exposed via MCP tools.
+> Note: Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP tools.
 
 ---
 

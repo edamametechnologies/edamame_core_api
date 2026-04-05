@@ -511,7 +511,7 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 31 | `dismiss_vulnerability_finding` | Vulnerability | Dismiss finding by `finding_key` |
 | 32 | `undismiss_vulnerability_finding` | Vulnerability | Restore dismissed finding |
 
-> Note: divergence lifecycle control (`start_divergence_engine`) is a direct RPC/CLI control plane method and is intentionally **not** exposed via MCP tools.
+> Note: Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP tools.
 
 Behavioral-model payloads use the v3 schema:
 - expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_grandparent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`

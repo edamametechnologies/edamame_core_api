@@ -1610,7 +1610,7 @@ Get engine status as JSON: running state, interval, last run timestamp, model ag
 
 **MCP tools**: Five of these methods are exposed as MCP tools: `upsert_behavioral_model`, `get_behavioral_model`, `get_divergence_verdict`, `get_divergence_history`, and `get_divergence_engine_status`.
 
-`start_divergence_engine` and `clear_behavioral_model` are direct API control-plane methods and are not exposed via MCP tools.
+`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` are direct API control-plane methods and are not exposed via MCP tools.
 
 ### Vulnerability Detector
 
