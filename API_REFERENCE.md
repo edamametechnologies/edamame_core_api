@@ -1295,7 +1295,10 @@ agentic_set_llm_config(
     slack_actions_channel: String,
     slack_escalations_channel: String,
     telegram_bot_token: String,
-    telegram_chat_id: String
+    telegram_chat_id: String,
+    slack_enabled: bool,
+    telegram_enabled: bool,
+    export_to_portal: bool
 ) -> bool
 ```
 
@@ -1308,6 +1311,8 @@ Configure the LLM provider. Supported providers:
 This same call also persists optional team-delivery routing for Security Agent notifications:
 - Slack bot token + separate action and escalation channels
 - Telegram bot token + destination chat ID
+- `slack_enabled` / `telegram_enabled` -- enable the corresponding notification channel
+- `export_to_portal` -- when true, agentic action history is exported to EDAMAME Portal
 
 #### agentic_get_llm_config
 
@@ -1315,7 +1320,7 @@ This same call also persists optional team-delivery routing for Security Agent n
 agentic_get_llm_config() -> LLMConfigInfoAPI
 ```
 
-Returns the current LLM configuration and saved delivery-channel settings (provider, model, base_url, API key presence and value, Slack routing, Telegram routing, and Telegram interactive state).
+Returns the current LLM configuration and saved delivery-channel settings (provider, model, base_url, API key presence and value, Slack routing, Telegram routing, Telegram interactive state, and export_to_portal flag).
 
 #### agentic_set_telegram_interactive_config
 
