@@ -1398,6 +1398,22 @@ agentic_get_token_usage_stats() -> TokenUsageStatsAPI
 
 Returns LLM token consumption statistics (input tokens, output tokens, total cost).
 
+#### get_agentic_memory_stats
+
+```
+get_agentic_memory_stats() -> String
+```
+
+Returns a JSON snapshot of in-memory cache sizes for the agentic subsystem (action history, divergence/vulnerability buffers, etc.). Used for diagnosing memory growth and tuning history caps.
+
+#### get_agentic_notification_history
+
+```
+get_agentic_notification_history(limit: usize) -> String
+```
+
+Returns the last `limit` agentic notifications dispatched (Slack/Telegram/Portal/local) as JSON, most recent first. Useful for auditing alert delivery without re-running detector ticks.
+
 #### agentic_get_subscription_status
 
 ```
@@ -1455,6 +1471,22 @@ agentic_mark_all_actions_read() -> bool
 ```
 
 Mark all actions as read.
+
+#### agentic_dismiss_action
+
+```
+agentic_dismiss_action(finding_key: String) -> bool
+```
+
+Dismiss a specific agentic finding (vulnerability or divergence) so it stops appearing in active reports/notifications. Returns `true` when a matching record was dismissed.
+
+#### agentic_undismiss_action
+
+```
+agentic_undismiss_action(finding_key: String) -> bool
+```
+
+Restore a previously dismissed agentic finding so it surfaces again in reports/notifications. Returns `true` when a matching dismissal was cleared.
 
 ### OAuth Authentication (Internal Provider)
 
@@ -1516,6 +1548,14 @@ Behavioral window schema (v3):
 - expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
 - negative dimensions: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
 
+#### upsert_behavioral_model_from_raw_sessions
+
+```
+upsert_behavioral_model_from_raw_sessions(raw_sessions_json: String) -> String
+```
+
+Build and upsert a behavioral-model window directly from a JSON array of raw session records (instead of supplying a pre-aggregated window). Used by tests and tools that already have observed sessions and want EDAMAME to derive predicted dimensions automatically. Returns the resulting window JSON.
+
 #### get_behavioral_model
 
 ```
@@ -1531,6 +1571,14 @@ get_behavioral_model_history(limit: usize) -> String
 ```
 
 Get recent behavioral-model injection snapshots as JSON. `limit` caps the number of entries returned.
+
+#### get_behavioral_model_contributors
+
+```
+get_behavioral_model_contributors() -> String
+```
+
+Get the list of components/clients (MCP, helper, tests) that have currently contributed to the behavioral model, with their last-injection timestamps and provided dimensions. Used by the UI and diagnostics to show "who is feeding the cortex".
 
 #### get_divergence_verdict
 
@@ -1564,6 +1612,30 @@ undismiss_divergence_evidence(finding_key: String) -> String
 ```
 
 Restore a previously dismissed divergence evidence item by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
+
+#### reset_divergence_suppressions
+
+```
+reset_divergence_suppressions() -> String
+```
+
+Reset every dismissed divergence evidence item so it surfaces again in verdicts and notifications. Returns JSON with `{ "success": true, "changed": bool }` indicating whether any dismissals were actually cleared.
+
+#### get_divergence_debug_trace
+
+```
+get_divergence_debug_trace(entry_id: String) -> String
+```
+
+Get the per-rule evaluation trace for a specific divergence-history entry (matched by `entry_id`) as JSON. Used to diagnose why the cortex extrapolator emitted a given verdict. Returns `{ "trace": null }` when the entry id is unknown.
+
+#### debug_run_divergence_tick
+
+```
+debug_run_divergence_tick() -> String
+```
+
+Force a single divergence-engine tick out of band (without waiting for the scheduled interval). Diagnostic-only; used by tests and the CLI when developers need a deterministic re-evaluation.
 
 #### clear_behavioral_model
 
@@ -1693,7 +1765,59 @@ get_vulnerability_detector_status() -> String
 
 Get detector status as JSON: running state, interval, last run timestamp, and current active-finding count.
 
+#### debug_run_vulnerability_detector_tick
+
+```
+debug_run_vulnerability_detector_tick() -> String
+```
+
+Force a single vulnerability-detector tick out of band (without waiting for the scheduled interval). Diagnostic-only; used by tests and the CLI when developers need a deterministic re-evaluation. Returns JSON describing whether a tick was actually executed (it may be skipped if a concurrent tick is already in flight).
+
 **LLM dependency**: The vulnerability detector itself runs model-independent checks and does not require an LLM provider to surface findings. For CI/security gates and automation flows it is strongly recommended to also configure an LLM via `agentic_set_llm_config`: EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text. Without an LLM, raw heuristic findings still surface and gate consumers (e.g. `edamame_posture vulnerability-status --fail-on-findings`).
+
+### Agent Plugins
+
+Provisioning helpers for first-class third-party agent integrations (Cursor, Claude Code, Claude Desktop, etc.). Each plugin owns its install layout, configuration, and uninstall routine; the API surfaces here are CLI/UI thin wrappers over `edamame_foundation::agent_plugin`. Requires the `agentic` feature flag.
+
+#### list_agent_plugins
+
+```
+list_agent_plugins() -> String
+```
+
+Returns a JSON array of supported agent plugins with their metadata (display name, repo, strategy kind, sort order, install state, version, install path).
+
+#### get_agent_plugin_status
+
+```
+get_agent_plugin_status(agent_type: String) -> String
+```
+
+Returns a JSON `AgentPluginStatus` record for the given agent type (e.g. `cursor`, `claude_code`, `claude_desktop`): install state, version, install path, error (if any), and display metadata.
+
+#### provision_agent_plugin
+
+```
+provision_agent_plugin(agent_type: String, workspace_root: String) -> String
+```
+
+Install or update the agent plugin of the given type into `workspace_root`. Standalone builds run the operation in-process; managed deployments delegate to the helper service. Returns JSON `AgentPluginProvisionResult` with `success`, `version`, `install_path`, and a human-readable `message`.
+
+#### test_agent_plugin
+
+```
+test_agent_plugin(agent_type: String) -> String
+```
+
+Run the plugin's self-test (typically: ensure binaries are reachable and configuration is valid) and return JSON describing the outcome. Used by the UI to surface "Plugin healthy" / "Plugin broken: <reason>" badges.
+
+#### uninstall_agent_plugin
+
+```
+uninstall_agent_plugin(agent_type: String) -> String
+```
+
+Remove the agent plugin of the given type from disk and clear its configuration. Returns JSON describing whether the operation succeeded and any removed paths.
 
 ---
 
@@ -1774,6 +1898,14 @@ mcpRotatePairedClient(client_id: String) -> String
 ```
 
 Rotate a paired client's credential. Returns the new credential. The old credential is invalidated.
+
+### mcp_delete_paired_client
+
+```
+mcp_delete_paired_client(client_id: String) -> String
+```
+
+Permanently delete a previously revoked paired client from the persistent registry. Unlike `mcpRevokePairedClient`, which keeps the entry for audit and can be reactivated by the user, `mcp_delete_paired_client` removes the row outright. Only operates on clients that are already revoked; returns an error JSON otherwise.
 
 ### MCP Tool Surface (24 tools)
 

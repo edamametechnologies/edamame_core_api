@@ -757,7 +757,7 @@ Security recommendations and AI-enriched advice.
 | `get_advisor_remediation` | question: String | String | AI advice for question |
 | `request_advisor_report` | email: String | void | Email advisor report |
 
-### Agentic / AI Automation (53 methods)
+### Agentic / AI Automation (69 methods)
 
 AI-powered security automation with multiple LLM providers.
 
@@ -789,18 +789,27 @@ AI-powered security automation with multiple LLM providers.
 | `agentic_mark_action_read` | action_id: String | bool | Mark action as read |
 | `agentic_mark_action_unread` | action_id: String | bool | Mark action as unread |
 | `agentic_mark_all_actions_read` | -- | bool | Mark all as read |
+| `agentic_dismiss_action` | finding_key: String | bool | Dismiss agentic finding |
+| `agentic_undismiss_action` | finding_key: String | bool | Restore dismissed agentic finding |
+| `get_agentic_memory_stats` | -- | String | In-memory cache snapshot for diagnostics |
+| `get_agentic_notification_history` | limit: usize | String | Recent agentic notifications dispatched |
 | `oauth_signin_internal` | -- | String | OAuth sign-in to EDAMAME Portal |
 | `oauth_refresh_internal` | -- | String | Refresh OAuth tokens |
 | `oauth_signout_internal` | -- | String | Sign out |
 | `oauth_get_status` | -- | OAuthStatusAPI | OAuth authentication status |
 | `oauth_open_signup` | -- | bool | Open sign-up page |
 | `upsert_behavioral_model` | window_json: String | String | Upsert behavioral model for two-plane correlation |
+| `upsert_behavioral_model_from_raw_sessions` | raw_sessions_json: String | String | Build behavioral model from raw sessions |
 | `get_behavioral_model` | -- | String | Get current behavioral model |
 | `get_behavioral_model_history` | limit: usize | String | Get behavioral-model injection history |
+| `get_behavioral_model_contributors` | -- | String | List components feeding the behavioral model |
 | `get_divergence_verdict` | -- | String | Get latest divergence verdict |
 | `get_divergence_history` | limit: usize | String | Get divergence verdict history |
 | `dismiss_divergence_evidence` | finding_key: String | String | Dismiss divergence evidence item |
 | `undismiss_divergence_evidence` | finding_key: String | String | Restore dismissed divergence evidence item |
+| `reset_divergence_suppressions` | -- | String | Reset every dismissed divergence finding |
+| `get_divergence_debug_trace` | entry_id: String | String | Per-rule trace for a divergence verdict |
+| `debug_run_divergence_tick` | -- | String | Force a divergence-engine tick (diagnostic) |
 | `clear_behavioral_model` | -- | void | Clear behavioral model (testing/debug) |
 | `clear_behavioral_model_history` | -- | void | Clear behavioral-model injection history |
 | `clear_divergence_history` | -- | void | Clear divergence verdict history |
@@ -815,9 +824,15 @@ AI-powered security automation with multiple LLM providers.
 | `clear_vulnerability_history` | -- | void | Clear vulnerability detector history |
 | `reset_vulnerability_suppressions` | -- | String | Reset every dismissed finding so it surfaces again |
 | `get_vulnerability_debug_trace` | report_id: String | String | Per-check evaluation trace for a specific report |
+| `debug_run_vulnerability_detector_tick` | -- | String | Force a vulnerability-detector tick (diagnostic) |
 | `get_vulnerability_detector_status` | -- | String | Get vulnerability detector runtime status |
+| `list_agent_plugins` | -- | String | List supported agent plugins (Cursor/Claude/...) |
+| `get_agent_plugin_status` | agent_type: String | String | Status of a specific agent plugin |
+| `provision_agent_plugin` | agent_type, workspace_root | String | Install or update an agent plugin |
+| `test_agent_plugin` | agent_type: String | String | Run an agent plugin's self-test |
+| `uninstall_agent_plugin` | agent_type: String | String | Remove an agent plugin |
 
-### MCP Server (9 methods)
+### MCP Server (10 methods)
 
 MCP server management and pairing (feature-gated: `mcp`).
 
@@ -832,6 +847,7 @@ MCP server management and pairing (feature-gated: `mcp`).
 | `mcpGetPendingPairingRequests` | -- | String | List pending pairing requests (JSON array) |
 | `mcpRevokePairedClient` | client_id: String | String | Revoke a paired client |
 | `mcpRotatePairedClient` | client_id: String | String | Rotate a client's credential |
+| `mcp_delete_paired_client` | client_id: String | String | Permanently delete a revoked paired client |
 
 > **Note**: PSK generation (`mcp_generate_psk`) is provided by the [EDAMAME Posture CLI](https://github.com/edamametechnologies/edamame_posture_cli), not by EDAMAME Core directly.
 
