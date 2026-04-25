@@ -426,6 +426,30 @@ Restore a previously dismissed vulnerability finding by its stable `finding_key`
 |------|------|----------|-------------|
 | `finding_key` | string | Yes | Stable key of the dismissed finding |
 
+### `get_vulnerability_history`
+
+Get historical vulnerability reports (summaries, most recent first). Each entry is a timestamped snapshot containing the active findings, severities, and stable finding keys at that tick. Useful for tracking how vulnerability posture evolves over time.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `limit` | integer | Yes | Maximum number of past reports to return (most recent first) |
+
+### `clear_vulnerability_history`
+
+Clear all stored vulnerability detector reports and finding history. Use for controlled resets or test cleanup. **Side effect**: erases the rolling report buffer; live findings are repopulated on the next detector tick.
+
+**Parameters**: None
+
+### `reset_vulnerability_suppressions`
+
+Reset every dismissed vulnerability finding so they surface again in reports, alerts, and chat actions. Returns `{ "success": true, "changed": bool, "message": ... }`; `changed` is `true` only if at least one dismissal was cleared.
+
+**Parameters**: None
+
+> Note: The vulnerability detector itself is model-independent and does not require an LLM provider. Findings will still surface (and gate consumers like `edamame_posture vulnerability-status --fail-on-findings`) without an LLM. For CI/security and chat workflows, configuring an LLM via `agentic_set_llm_config` is strongly recommended -- EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text.
+
 ---
 
 ## L7 Session Enrichment Fields

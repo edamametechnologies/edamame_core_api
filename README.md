@@ -510,6 +510,9 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 30 | `get_vulnerability_detector_status` | Vulnerability | Detector runtime status |
 | 31 | `dismiss_vulnerability_finding` | Vulnerability | Dismiss finding by `finding_key` |
 | 32 | `undismiss_vulnerability_finding` | Vulnerability | Restore dismissed finding |
+| 33 | `get_vulnerability_history` | Vulnerability | Rolling history of vulnerability detector reports |
+| 34 | `clear_vulnerability_history` | Vulnerability | Clear stored vulnerability detector reports (side effect) |
+| 35 | `reset_vulnerability_suppressions` | Vulnerability | Reset every dismissed finding so it surfaces again |
 
 > Note: Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP tools.
 
@@ -754,7 +757,7 @@ Security recommendations and AI-enriched advice.
 | `get_advisor_remediation` | question: String | String | AI advice for question |
 | `request_advisor_report` | email: String | void | Email advisor report |
 
-### Agentic / AI Automation (51 methods)
+### Agentic / AI Automation (53 methods)
 
 AI-powered security automation with multiple LLM providers.
 
@@ -810,6 +813,8 @@ AI-powered security automation with multiple LLM providers.
 | `dismiss_vulnerability_finding` | finding_key: String | String | Dismiss vulnerability finding |
 | `undismiss_vulnerability_finding` | finding_key: String | String | Restore dismissed vulnerability finding |
 | `clear_vulnerability_history` | -- | void | Clear vulnerability detector history |
+| `reset_vulnerability_suppressions` | -- | String | Reset every dismissed finding so it surfaces again |
+| `get_vulnerability_debug_trace` | report_id: String | String | Per-check evaluation trace for a specific report |
 | `get_vulnerability_detector_status` | -- | String | Get vulnerability detector runtime status |
 
 ### MCP Server (9 methods)

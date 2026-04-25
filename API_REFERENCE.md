@@ -1669,6 +1669,22 @@ clear_vulnerability_history() -> ()
 
 Clear stored vulnerability detector report history.
 
+#### reset_vulnerability_suppressions
+
+```
+reset_vulnerability_suppressions() -> String
+```
+
+Reset every dismissed vulnerability finding so it surfaces again in reports and alerts. Returns JSON with `{ "success": true, "changed": bool }` indicating whether any dismissals were actually cleared.
+
+#### get_vulnerability_debug_trace
+
+```
+get_vulnerability_debug_trace(report_id: String) -> String
+```
+
+Get the per-check evaluation trace for a specific vulnerability report (matched by `report_id`) as JSON. Used for diagnosing why a finding was or was not raised. Returns `{ "trace": null }` when the report id is unknown.
+
 #### get_vulnerability_detector_status
 
 ```
@@ -1676,6 +1692,8 @@ get_vulnerability_detector_status() -> String
 ```
 
 Get detector status as JSON: running state, interval, last run timestamp, and current active-finding count.
+
+**LLM dependency**: The vulnerability detector itself runs model-independent checks and does not require an LLM provider to surface findings. For CI/security gates and automation flows it is strongly recommended to also configure an LLM via `agentic_set_llm_config`: EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text. Without an LLM, raw heuristic findings still surface and gate consumers (e.g. `edamame_posture vulnerability-status --fail-on-findings`).
 
 ---
 
