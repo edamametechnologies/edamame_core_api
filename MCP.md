@@ -9,6 +9,40 @@ Complete reference for all MCP (Model Context Protocol) tools exposed by EDAMAME
 
 ---
 
+## Observer-Independence Policy (Important)
+
+EDAMAME implements a two-plane runtime monitoring architecture:
+
+- **Reasoning plane**: the LLM agent (Claude Desktop, Cursor, OpenClaw, etc.) declaring intent.
+- **System plane**: EDAMAME observing actual system behavior and producing security findings (vulnerability detector, divergence engine).
+
+For this architecture to be meaningful, the **observed** (the LLM agent) must not be able to silence findings about its **own** behavior. Otherwise an attacker who has compromised the agent could trivially dismiss the very findings that would catch them.
+
+The MCP tool surface therefore enforces a strict read-only contract for security findings and dismissal state:
+
+| Concern | MCP exposure | Operator surface |
+|---|---|---|
+| Read divergence verdicts / history / engine status | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Read vulnerability findings / history / detector status | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Read active dismissal rules + audit log | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Dismiss a vulnerability finding | **NO** | EDAMAME app (AI tab > Radar > Dismiss), edamame_cli RPC |
+| Undismiss a vulnerability finding | **NO** | EDAMAME app, edamame_cli RPC |
+| Dismiss a divergence evidence group | **NO** | EDAMAME app (AI tab > Brain Scan > Dismiss), edamame_cli RPC |
+| Undismiss a divergence evidence group | **NO** | EDAMAME app, edamame_cli RPC |
+| Dismiss with scope (recurrence-aware rules) | **NO** | EDAMAME app (Dismiss with scope... dialog), edamame_cli RPC |
+| Remove / promote / demote a dismissal rule | **NO** | EDAMAME app (Dismissal rules section), edamame_cli RPC |
+| Reset all dismissal rules | **NO** | EDAMAME app, edamame_cli RPC |
+| Clear divergence state (model + verdicts + engine state) | **NO** | edamame_cli RPC, integration tests only |
+| Clear vulnerability history | **NO** | edamame_cli RPC, integration tests only |
+| Reset vulnerability suppressions | **NO** | edamame_cli RPC, integration tests only |
+| Clear dismissal audit log | **NO** | EDAMAME app, edamame_cli RPC |
+
+The corresponding **RPC** endpoints (`agentic_dismiss_with_scope`, `dismiss_vulnerability_finding`, `clear_divergence_state`, ...) remain available -- only their MCP tool exposure has been removed. RPC is the operator-facing control plane (EDAMAME app, `edamame_cli`); MCP is the LLM-facing observation plane.
+
+CI integration tests that need to clear vulnerability/divergence state between scenarios call the RPC layer directly (`edamame_cli rpc clear_vulnerability_history`, `edamame_cli rpc clear_divergence_state`, etc.) -- these never went through the MCP tool path.
+
+---
+
 ## Authentication
 
 The MCP server supports two authentication modes:
@@ -61,17 +95,19 @@ Poll pairing status. Returns JSON with `status` and optional `credential`:
 
 ## Table of Contents
 
-1. [Authentication](#authentication)
-2. [Pairing Endpoints](#pairing-endpoints)
-3. [Advisor Tools](#advisor-tools)
-4. [Observation Tools -- System Plane Telemetry](#observation-tools----system-plane-telemetry)
-5. [Identity / HIBP Management Tools](#identity--hibp-management-tools)
-6. [LAN Scan Configuration Tools](#lan-scan-configuration-tools)
-7. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
-8. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
-9. [Vulnerability Detection Tools](#vulnerability-detection-tools)
-10. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
-11. [Server Management](#server-management)
+1. [Observer-Independence Policy](#observer-independence-policy-important)
+2. [Authentication](#authentication)
+3. [Pairing Endpoints](#pairing-endpoints)
+4. [Advisor Tools](#advisor-tools)
+5. [Observation Tools -- System Plane Telemetry](#observation-tools----system-plane-telemetry)
+6. [Identity / HIBP Management Tools](#identity--hibp-management-tools)
+7. [LAN Scan Configuration Tools](#lan-scan-configuration-tools)
+8. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
+9. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
+10. [Vulnerability Detection Tools](#vulnerability-detection-tools)
+11. [Recurrence-Aware Dismissal Rules (read-only)](#recurrence-aware-dismissal-rules-read-only)
+12. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
+13. [Server Management](#server-management)
 
 ---
 
@@ -354,33 +390,9 @@ Get the divergence engine runtime status: whether it is running, the configured 
 
 **Parameters**: None
 
-### `dismiss_divergence_evidence`
-
-Dismiss a divergence evidence group by its stable `finding_key`. Acknowledges a known-benign behavioral mismatch without deleting the evidence. Reversible via `undismiss_divergence_evidence`.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `finding_key` | string | Yes | Stable key from the evidence (e.g. `divergence:ec61e11fae833735d8f6c84659f4127ab1956ab297f705a6da691c4e898f8653`) |
-
-### `undismiss_divergence_evidence`
-
-Restore a previously dismissed divergence evidence group by its stable `finding_key`.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `finding_key` | string | Yes | Stable key of the dismissed evidence |
-
-### `clear_divergence_state`
-
-Clear the current behavioral model, divergence verdict history, and divergence-engine runtime state. Use in tests or controlled resets before pushing a new model window. **SIDE EFFECTS.**
-
-**Parameters**: None
-
-> Note: Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP tools.
+> **Observer-independence**: Mutation operations on divergence findings (`dismiss_divergence_evidence`, `undismiss_divergence_evidence`, `dismiss_divergence_evidence_with_scope`, `clear_divergence_state`) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence findings about its own behavior. Use the EDAMAME app (AI tab > Brain Scan) or `edamame_cli rpc` for these operations.
+>
+> Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP tools either.
 
 ---
 
@@ -406,26 +418,6 @@ Get the current status of the vulnerability detector: enabled state, evaluation 
 
 **Parameters**: None
 
-### `dismiss_vulnerability_finding`
-
-Dismiss a vulnerability finding by its stable `finding_key`. Use when a CVE-aligned heuristic finding is known/accepted.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `finding_key` | string | Yes | Stable key from the finding (e.g. `vuln:4ba5528a37997db4f405710cb1a90cc1c5605adac8beffb390c7e7ef572ab325`) |
-
-### `undismiss_vulnerability_finding`
-
-Restore a previously dismissed vulnerability finding by its stable `finding_key`.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `finding_key` | string | Yes | Stable key of the dismissed finding |
-
 ### `get_vulnerability_history`
 
 Get historical vulnerability reports (summaries, most recent first). Each entry is a timestamped snapshot containing the active findings, severities, and stable finding keys at that tick. Useful for tracking how vulnerability posture evolves over time.
@@ -436,19 +428,56 @@ Get historical vulnerability reports (summaries, most recent first). Each entry 
 |------|------|----------|-------------|
 | `limit` | integer | Yes | Maximum number of past reports to return (most recent first) |
 
-### `clear_vulnerability_history`
+> **Observer-independence**: Mutation operations on vulnerability findings (`dismiss_vulnerability_finding`, `undismiss_vulnerability_finding`, `dismiss_vulnerability_finding_with_scope`, `clear_vulnerability_history`, `reset_vulnerability_suppressions`) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence vulnerability findings about its own behavior. Use the EDAMAME app (AI tab > Radar > Dismiss) or `edamame_cli rpc` for these operations.
+>
+> The vulnerability detector itself is model-independent and does not require an LLM provider. Findings will still surface (and gate consumers like `edamame_posture vulnerability-status --fail-on-findings`) without an LLM. For CI/security and chat workflows, configuring an LLM via `agentic_set_llm_config` is strongly recommended -- EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text.
 
-Clear all stored vulnerability detector reports and finding history. Use for controlled resets or test cleanup. **Side effect**: erases the rolling report buffer; live findings are repopulated on the next detector tick.
+---
 
-**Parameters**: None
+## Recurrence-Aware Dismissal Rules (read-only)
 
-### `reset_vulnerability_suppressions`
+EDAMAME supports recurrence-aware dismissal rules that suppress entire classes of findings (for example "all `process_for_check` findings for `node` running `cursor-stable`" or "all `agent_workspace_pattern` divergence findings for one Cursor workspace"). See [edamame_core/AGENTICIMPROVEMENTS.md](https://github.com/edamametechnologies/edamame_core/blob/main/AGENTICIMPROVEMENTS.md) for the full rule model.
 
-Reset every dismissed vulnerability finding so they surface again in reports, alerts, and chat actions. Returns `{ "success": true, "changed": bool, "message": ... }`; `changed` is `true` only if at least one dismissal was cleared.
+The MCP surface exposes these rules as **read-only**: the LLM can see what is being suppressed (and feed that into reasoning prompts) but cannot create, modify, or remove rules. Operators manage rules through the EDAMAME app's `AI > Dismissal rules` section or the `edamame_cli` RPC surface.
 
-**Parameters**: None
+### `list_agentic_dismissal_rules`
 
-> Note: The vulnerability detector itself is model-independent and does not require an LLM provider. Findings will still surface (and gate consumers like `edamame_posture vulnerability-status --fail-on-findings`) without an LLM. For CI/security and chat workflows, configuring an LLM via `agentic_set_llm_config` is strongly recommended -- EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text.
+READ-ONLY. List active recurrence-aware dismissal rules. Each rule entry includes:
+
+- `id` -- stable rule identifier
+- `domain` -- `vulnerability` or `divergence`
+- `scope` -- `finding`, `process_for_check`, `process_lineage`, `process_and_material_class`, or `agent_workspace_pattern`
+- `matcher` -- the structured matcher (process name/path, parent lineage, agent identity, material classes, etc.)
+- `source` -- `operator` (created via UI/CLI) or `legacy_migration` (imported from a v1 dismissal)
+- `severity_ceiling` -- `high_and_below` (default) or `critical_capable`
+- `created_at`, `expires_at` -- lifecycle timestamps
+- `hit_count`, `last_hit_at` -- telemetry showing how often the rule has fired
+
+**Parameters**:
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `domain` | string | `""` | `""` for all, `"vulnerability"`, or `"divergence"` |
+
+### `list_agentic_dismissal_audit_log`
+
+READ-ONLY. List the recurrence-aware dismissal audit log. Each entry records when a rule was:
+
+- created
+- removed
+- expired
+- had its `severity_ceiling` changed
+- imported from a legacy v1 dismissal
+
+Useful for incident review and explaining "why didn't I see this finding?".
+
+**Parameters**:
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `limit` | integer | 50 | Maximum number of entries to return; `0` returns all entries |
+
+> **Observer-independence**: The corresponding mutation tools (`dismiss_vulnerability_finding_with_scope`, `dismiss_divergence_evidence_with_scope`, `remove_agentic_dismissal_rule`, `set_agentic_dismissal_rule_severity_ceiling`, `reset_agentic_dismissal_rules`, `clear_agentic_dismissal_audit_log`) are intentionally **not** exposed via MCP. Operators mutate dismissal state via the EDAMAME app or `edamame_cli rpc`.
 
 ---
 

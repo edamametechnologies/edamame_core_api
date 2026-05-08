@@ -472,7 +472,7 @@ edamame_posture background-mcp-generate-psk
 
 For the EDAMAME Security desktop app, configure credentials under AI tab > MCP Server Settings (pairing UI or shared PSK).
 
-### MCP Tools Exposed (32 tools)
+### MCP Tools Exposed (28 tools)
 
 See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, return types, and L7 session field documentation.
 
@@ -500,21 +500,30 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 20 | `upsert_behavioral_model` | Divergence | Push reasoning-plane behavioral model |
 | 21 | `upsert_behavioral_model_from_raw_sessions` | Divergence | Push raw sessions, EDAMAME LLM generates model |
 | 22 | `get_behavioral_model` | Divergence | Read stored behavioral model |
-| 23 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
-| 24 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
-| 25 | `get_divergence_engine_status` | Divergence | Divergence engine status |
-| 26 | `dismiss_divergence_evidence` | Divergence | Dismiss evidence by `finding_key` |
-| 27 | `undismiss_divergence_evidence` | Divergence | Restore dismissed evidence |
-| 28 | `clear_divergence_state` | Divergence | Clear model, verdict history, engine state |
-| 29 | `get_vulnerability_findings` | Vulnerability | CVE-aligned heuristic findings (5 checks: token_exfiltration, skill_supply_chain, credential_harvest, sandbox_exploitation, gateway_binding) |
-| 30 | `get_vulnerability_detector_status` | Vulnerability | Detector runtime status |
-| 31 | `dismiss_vulnerability_finding` | Vulnerability | Dismiss finding by `finding_key` |
-| 32 | `undismiss_vulnerability_finding` | Vulnerability | Restore dismissed finding |
-| 33 | `get_vulnerability_history` | Vulnerability | Rolling history of vulnerability detector reports |
-| 34 | `clear_vulnerability_history` | Vulnerability | Clear stored vulnerability detector reports (side effect) |
-| 35 | `reset_vulnerability_suppressions` | Vulnerability | Reset every dismissed finding so it surfaces again |
+| 23 | `get_divergence_verdict` | Divergence | Get latest divergence verdict (read-only) |
+| 24 | `get_divergence_history` | Divergence | Rolling divergence verdict history (read-only) |
+| 25 | `get_divergence_engine_status` | Divergence | Divergence engine status (read-only) |
+| 26 | `get_vulnerability_findings` | Vulnerability | CVE-aligned heuristic findings (read-only) |
+| 27 | `get_vulnerability_detector_status` | Vulnerability | Detector runtime status (read-only) |
+| 28 | `get_vulnerability_history` | Vulnerability | Rolling history of vulnerability detector reports (read-only) |
+| 29 | `list_agentic_dismissal_rules` | Dismissal | Read-only: active recurrence-aware dismissal rules with telemetry |
+| 30 | `list_agentic_dismissal_audit_log` | Dismissal | Read-only: audit log of dismissal-rule lifecycle events |
 
-> Note: Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP tools.
+> **Observer-independence policy** (CRITICAL): The reasoning plane (LLM agent) must not be
+> able to silence security findings about its own behavior. Therefore, the MCP surface for
+> divergence and vulnerability findings is **read-only**. Dismissal mutation operations
+> (`dismiss_*`, `undismiss_*`, `dismiss_*_with_scope`, `clear_divergence_state`,
+> `clear_vulnerability_history`, `reset_vulnerability_suppressions`,
+> `remove_agentic_dismissal_rule`, `set_agentic_dismissal_rule_severity_ceiling`,
+> `reset_agentic_dismissal_rules`, `clear_agentic_dismissal_audit_log`) are
+> **operator-only** via the EDAMAME app UI (AI tab > Dismissal rules) and the
+> `edamame_cli` RPC surface. The corresponding RPC endpoints remain available -- only
+> their MCP tool exposure is removed.
+>
+> Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`,
+> `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are
+> direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP
+> tools either.
 
 Behavioral-model payloads use the v3 schema:
 - expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_grandparent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
