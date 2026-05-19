@@ -554,12 +554,12 @@ The MCP server is managed via API methods (also available as CLI commands via `e
 | `mcp_start_server(port, psk, enable_cors, listen_all_interfaces)` | `edamame-posture mcp-start [--port PORT] [--all-interfaces] [--enable-cors]` | Start MCP server |
 | `mcp_stop_server()` | `edamame-posture mcp-stop` | Stop MCP server |
 | `mcp_get_server_status()` | `edamame-posture mcp-status` | Check server status |
-| `mcpApprovePairing(request_id)` | (host app only) | Approve a pending pairing request |
-| `mcpRejectPairing(request_id)` | (host app only) | Reject a pending pairing request |
-| `mcpListPairedClients()` | (host app only) | List all paired clients (JSON array) |
-| `mcpGetPendingPairingRequests()` | (host app only) | List pending pairing requests (JSON array) |
-| `mcpRevokePairedClient(client_id)` | (host app only) | Revoke a paired client |
-| `mcpRotatePairedClient(client_id)` | (host app only) | Rotate a client's credential |
+| `mcp_approve_pairing(request_id)` (Flutter bridge: `mcpApprovePairing`) | (host app only) | Approve a pending pairing request |
+| `mcp_reject_pairing(request_id)` (Flutter bridge: `mcpRejectPairing`) | (host app only) | Reject a pending pairing request |
+| `mcp_list_paired_clients()` (Flutter bridge: `mcpListPairedClients`) | (host app only) | List all paired clients (JSON array) |
+| `mcp_get_pending_pairing_requests()` (Flutter bridge: `mcpGetPendingPairingRequests`) | (host app only) | List pending pairing requests (JSON array) |
+| `mcp_revoke_paired_client(client_id)` (Flutter bridge: `mcpRevokePairedClient`) | (host app only) | Revoke a paired client |
+| `mcp_rotate_paired_client(client_id)` (Flutter bridge: `mcpRotatePairedClient`) | (host app only) | Rotate a client's credential |
 
 PSK generation: `edamame-posture mcp-generate-psk`
 
@@ -633,7 +633,16 @@ Use a per-client credential (from pairing) or shared PSK:
 | 18 | `agentic_execute_action` | Agentic | Execute pending action |
 | 19 | `agentic_get_workflow_status` | Agentic | Workflow progress |
 | 20 | `upsert_behavioral_model` | Divergence | Push reasoning-plane behavioral model |
-| 21 | `get_behavioral_model` | Divergence | Read stored behavioral model |
-| 22 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
-| 23 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
-| 24 | `get_divergence_engine_status` | Divergence | Divergence engine status |
+| 21 | `upsert_behavioral_model_from_raw_sessions` | Divergence | Build + push model directly from raw session JSON |
+| 22 | `get_behavioral_model` | Divergence | Read stored behavioral model |
+| 23 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
+| 24 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
+| 25 | `get_divergence_engine_status` | Divergence | Divergence engine status |
+| 26 | `get_vulnerability_findings` | Vulnerability | Active findings (read-only) |
+| 27 | `get_vulnerability_detector_status` | Vulnerability | Detector running state and counts |
+| 28 | `get_vulnerability_history` | Vulnerability | Rolling history of detector reports |
+| 29 | `list_agentic_dismissal_rules` | Dismissal Rules | Read-only list of recurrence-aware dismissal rules |
+| 30 | `list_agentic_dismissal_audit_log` | Dismissal Rules | Read-only dismissal audit log |
+| 31 | `get_file_events` | FIM | Recent FIM events snapshot |
+| 32 | `get_file_monitor_status` | FIM | FIM watcher running state and roots |
+| 33 | `get_file_event_summary` | FIM | Aggregated FIM event summary |

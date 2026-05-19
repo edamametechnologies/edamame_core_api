@@ -19,6 +19,8 @@ Methods are organized by API domain. Health-related methods are omitted from thi
 - [Trust & Compliance](#trust--compliance)
 - [Advisor](#advisor)
 - [Agentic / AI Automation](#agentic--ai-automation)
+- [File Integrity Monitoring (FIM)](#file-integrity-monitoring-fim)
+- [Privacy](#privacy)
 - [MCP Server](#mcp-server)
 - [Test Utilities](#test-utilities)
 - [RPC Discovery](#rpc-discovery)
@@ -1398,6 +1400,22 @@ agentic_get_token_usage_stats() -> TokenUsageStatsAPI
 
 Returns LLM token consumption statistics (input tokens, output tokens, total cost).
 
+#### agentic_get_loop_token_usage
+
+```
+agentic_get_loop_token_usage() -> LoopTokenUsageAPI
+```
+
+Returns per-loop LLM token usage broken down across the three agentic loops: `agentic` (todo auto-processing), `vuln` (vulnerability detector LLM adjudication), and `divergence` (divergence engine LLM adjudication, including the raw-session model ingest path). Each loop reports `*_in` and `*_out` token counts plus a shared `since_unix_secs` reset timestamp. Used to attribute LLM cost to the loop that generated it.
+
+#### agentic_reset_loop_token_usage
+
+```
+agentic_reset_loop_token_usage() -> bool
+```
+
+Reset the per-loop LLM token usage counters back to zero and persist the reset to disk. Returns `true` when persistence succeeded.
+
 #### get_agentic_memory_stats
 
 ```
@@ -1597,6 +1615,22 @@ get_divergence_history(limit: usize) -> String
 
 Get rolling history of divergence verdicts as JSON. `limit` caps the number of entries returned.
 
+#### get_divergence_incidents
+
+```
+get_divergence_incidents(limit: usize) -> String
+```
+
+Get the rolling list of divergence incidents (groups of correlated verdicts) as JSON. `limit` caps the number of incidents returned. Each entry summarizes a multi-verdict episode rather than individual verdicts.
+
+#### get_divergence_incident
+
+```
+get_divergence_incident(incident_id: String) -> String
+```
+
+Get the full record for a single divergence incident (matched by `incident_id`) as JSON. Returns `{ "incident": null }` when the id is unknown.
+
 #### dismiss_divergence_evidence
 
 ```
@@ -1775,6 +1809,112 @@ Force a single vulnerability-detector tick out of band (without waiting for the 
 
 **LLM dependency**: The vulnerability detector itself runs model-independent checks and does not require an LLM provider to surface findings. For CI/security gates and automation flows it is strongly recommended to also configure an LLM via `agentic_set_llm_config`: EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text. Without an LLM, raw heuristic findings still surface and gate consumers (e.g. `edamame_posture vulnerability-status --fail-on-findings`).
 
+### Recurrence-Aware Dismissal Rules
+
+Operator-only dismissal-rule plane: every `agentic_*_dismissal*` RPC mutates EDAMAME's local dismissal store and is **not** exposed via MCP (per the observer-independence policy). Rules dismiss vulnerability or divergence findings under explicit scopes (`finding`, `process_for_check`, `process_lineage`, `process_and_material_class`, `agent_workspace_pattern`) with optional TTL and a severity ceiling that controls whether the rule may suppress CRITICAL findings.
+
+#### agentic_add_dismissal_rule
+
+```
+agentic_add_dismissal_rule(rule_json: String) -> String
+```
+
+Add a dismissal rule. `rule_json` carries the operator-supplied envelope:
+
+```
+{
+  "domain":  "vulnerability" | "divergence",
+  "scope":   "finding" | "process_for_check" | "process_lineage" |
+             "process_and_material_class" | "agent_workspace_pattern",
+  "matcher": { ...DismissalRuleMatcherAPI... },
+  "ttl_secs": <i64?>,
+  "reason":   <string?>,
+  "source_finding_key": <string?>,
+  "severity_ceiling": "high_and_below" | "critical_capable",
+  "source_context": { "finding_title", "check_or_category", "process_name", "severity", "details" }
+}
+```
+
+Returns `{ "success": bool, "rule_id"?: string, "error"?: string }`.
+
+#### agentic_dismiss_with_scope
+
+```
+agentic_dismiss_with_scope(request_json: String) -> String
+```
+
+Convenience wrapper around `agentic_add_dismissal_rule`: dismiss a single finding under a chosen scope, auto-filling the matcher when `scope = "finding"`. The `request_json` envelope mirrors `agentic_add_dismissal_rule` plus a top-level `finding_key`. Returns `{ "success": bool, "rule_id"?: string, "error"?: string }`.
+
+#### agentic_report_dismissal
+
+```
+agentic_report_dismissal(request_json: String) -> String
+```
+
+Operator-initiated, opt-in report of a vulnerability or divergence dismissal to the EDAMAME backend. Mirrors the device-feedback `dislike_device_type` shape: this RPC does NOT change local policy (the dismissal rule is already applied via `agentic_dismiss_with_scope` before this is called) -- it only sends the operator's feedback. Carries the matcher fields, the dismissal scope/severity ceiling/TTL, agent identity, and an optional consent note + email. Returns `{ "success": bool, "error"?: string }`.
+
+#### agentic_remove_dismissal_rule
+
+```
+agentic_remove_dismissal_rule(rule_id: String) -> String
+```
+
+Remove a dismissal rule by id. Returns `{ "success": bool, "removed": bool, "error"?: string }`.
+
+#### agentic_list_dismissal_rules
+
+```
+agentic_list_dismissal_rules(domain: String) -> String
+```
+
+List dismissal rules. `domain` may be `""` (all), `"vulnerability"`, or `"divergence"`. Returns `{ "success": true, "rules": [DismissalRuleAPI, ...] }`.
+
+#### agentic_list_dismissal_audit_log
+
+```
+agentic_list_dismissal_audit_log(limit: u32) -> String
+```
+
+List the dismissal audit log, newest first. `limit = 0` uses the bounded default read limit. Returns `{ "success": true, "entries": [DismissalAuditEntryAPI, ...] }`.
+
+#### agentic_set_dismissal_rule_severity_ceiling
+
+```
+agentic_set_dismissal_rule_severity_ceiling(request_json: String) -> String
+```
+
+Promote or demote a rule's `severity_ceiling`. `request_json`:
+
+```
+{ "rule_id": "<uuid>", "severity_ceiling": "high_and_below" | "critical_capable", "reason": "<required for promotion to critical_capable>" }
+```
+
+Returns `{ "success": bool, "changed": bool, "error"?: string }`.
+
+#### agentic_reset_dismissal_rules
+
+```
+agentic_reset_dismissal_rules() -> String
+```
+
+Remove every dismissal rule. Returns `{ "success": true, "changed": bool }` indicating whether any rules were actually cleared.
+
+#### agentic_clear_dismissal_audit_log
+
+```
+agentic_clear_dismissal_audit_log() -> String
+```
+
+Truncate the dismissal audit log. Returns `{ "success": true, "changed": bool }`.
+
+#### agentic_prune_expired_dismissal_rules
+
+```
+agentic_prune_expired_dismissal_rules() -> String
+```
+
+Force a single sweep that removes any dismissal rules whose `ttl_secs` has elapsed. Returns `{ "success": true, "removed": <count> }`. The detector tick performs this sweep automatically; this RPC is for operator-driven maintenance.
+
 ### Agent Plugins
 
 Provisioning helpers for first-class third-party agent integrations (Cursor, Claude Code, Claude Desktop, etc.). Each plugin owns its install layout, configuration, and uninstall routine; the API surfaces here are CLI/UI thin wrappers over `edamame_foundation::agent_plugin`. Requires the `agentic` feature flag.
@@ -1811,6 +1951,14 @@ test_agent_plugin(agent_type: String) -> String
 
 Run the plugin's self-test (typically: ensure binaries are reachable and configuration is valid) and return JSON describing the outcome. Used by the UI to surface "Plugin healthy" / "Plugin broken: <reason>" badges.
 
+#### get_agent_plugin_health
+
+```
+get_agent_plugin_health(agent_type: String) -> String
+```
+
+Return a richer health JSON for the given agent plugin: install state, version, last self-test outcome, MCP bridge reachability, and any background telemetry (e.g. transcript observer status) the plugin contributes. Used by the UI's plugin detail view.
+
 #### uninstall_agent_plugin
 
 ```
@@ -1818,6 +1966,138 @@ uninstall_agent_plugin(agent_type: String) -> String
 ```
 
 Remove the agent plugin of the given type from disk and clear its configuration. Returns JSON describing whether the operation succeeded and any removed paths.
+
+### External Transcript Observer
+
+Per-agent host-side observer that reads each discovered agent's transcripts from disk and feeds the existing `upsert_behavioral_model_from_raw_sessions` pipeline (see `AGENTIC.md`). Discovery is independent of plugin install state, so divergence detection works end-to-end without an in-agent bridge. Pausing the observer for a discovered agent trips the corresponding `unsecured_<agent>` internal threat.
+
+#### get_transcript_observer_status
+
+```
+get_transcript_observer_status() -> String
+```
+
+Returns a JSON snapshot of the per-agent observer state: discovered agents, enabled flag per agent, last tick timestamp, last hash, and any error text. Used by the AI / Config tab and diagnostics.
+
+#### set_transcript_observer_enabled
+
+```
+set_transcript_observer_enabled(agent_type: String, enabled: bool) -> String
+```
+
+Enable or disable the transcript observer for a specific agent (e.g. `cursor`, `claude_code`, `claude_desktop`, `openclaw`). Disabling a discovered agent's observer trips `unsecured_<agent>`. Returns the updated observer-status JSON.
+
+#### run_transcript_observer_tick_for
+
+```
+run_transcript_observer_tick_for(agent_type: String) -> String
+```
+
+Force a single observer tick for the given agent without waiting for the scheduled interval. Used by tests and the CLI when developers need a deterministic re-evaluation. Returns the updated observer-status JSON, or an error JSON when the agent type is unknown.
+
+---
+
+## File Integrity Monitoring (FIM)
+
+File integrity monitoring engine. Watches a configured set of paths for create / modify / rename / delete events, hashes content with BLAKE3 (subject to `fim_hash_size_threshold`), and feeds events into the vulnerability detector for sensitive-path / temp-staging analysis. Requires the `fim` feature flag.
+
+**Source**: `api/api_fim.rs`. See `FIM.md` in the core repo for the engine architecture and helper/standalone convergence story.
+
+### start_file_monitor
+
+```
+start_file_monitor(paths: Vec<String>) -> ()
+```
+
+Start the FIM watcher on the supplied list of root paths. When `paths` is empty, the engine falls back to the converged default set computed by `edamame_foundation::fim_support`. The watcher initialization is non-blocking (the recursive `notify` walk runs on `spawn_blocking` so the gRPC handler returns promptly even on hosts with very large watch trees).
+
+### stop_file_monitor
+
+```
+stop_file_monitor() -> ()
+```
+
+Stop the FIM watcher and release its inotify / FSEvents / ReadDirectoryChangesW handles.
+
+### get_file_events
+
+```
+get_file_events() -> FimSnapshotAPI
+```
+
+Return the rolling snapshot of recent FIM events (path, kind, timestamp, hash, writer process attribution when available). The snapshot is a bounded window; older events fall off as the buffer fills.
+
+### get_file_monitor_status
+
+```
+get_file_monitor_status() -> FileMonitorStatusAPI
+```
+
+Return the watcher state: running flag, watch root list, last-error string, and per-platform engine details. Used by the UI and the vulnerability gate's `dump_vulnerability_findings: true` step.
+
+### clear_file_events
+
+```
+clear_file_events() -> ()
+```
+
+Truncate the in-memory FIM event buffer. Operator-driven hygiene; equivalent to `edamame_cli rpc clear_file_events`.
+
+### get_fim_suspicious_status
+
+```
+get_fim_suspicious_status() -> bool
+```
+
+Return `true` when the FIM event buffer currently contains at least one event flagged as suspicious by the FIM heuristic (sensitive-path write, temp-script staging, etc.). Surfaced in the score bar.
+
+---
+
+## Privacy
+
+Privacy preferences toggles for analytics and crash reporting. Persisted on disk and applied at runtime where possible. Persisted struct: `PrivacyPreferences` (see core repo invariants -- new fields MUST add `#[serde(default)]`).
+
+**Source**: `api/api_privacy.rs`
+
+### get_privacy_preferences
+
+```
+get_privacy_preferences() -> PrivacyPreferencesAPI
+```
+
+Return the current privacy preferences as a struct: `analytics_enabled`, `crash_reports_enabled`. Used by the Privacy settings tab.
+
+### set_analytics_enabled
+
+```
+set_analytics_enabled(enabled: bool) -> ()
+```
+
+Persist the analytics toggle and apply it to the live analytics instance. The launch-time `CoreOptions.analytics_enabled` is the outer gate; this preference toggles the inner gate. When the user enables analytics here but the launch-time toggle was false (CLI), the inner gate is still flipped so any future re-init picks up the new preference.
+
+### set_crash_reports_enabled
+
+```
+set_crash_reports_enabled(enabled: bool) -> ()
+```
+
+Persist the crash-reports toggle. Crash reports are honored at app launch only; flipping this at runtime takes effect on next launch (the Flutter UI surfaces this with a snackbar).
+
+### get_analytics_enabled
+
+```
+get_analytics_enabled() -> bool
+```
+
+Read the persisted analytics preference. Mirror of the `analytics_enabled` field in `get_privacy_preferences`.
+
+### get_crash_reports_enabled
+
+```
+get_crash_reports_enabled() -> bool
+```
+
+Read the persisted crash-reports preference. Mirror of the `crash_reports_enabled` field in `get_privacy_preferences`.
 
 ---
 
@@ -1851,50 +2131,62 @@ mcp_get_server_status() -> String
 
 Returns the MCP server status (running/stopped, port, etc.).
 
-### mcpApprovePairing
+### mcp_approve_pairing
+
+(Flutter bridge: `mcpApprovePairing`)
 
 ```
-mcpApprovePairing(request_id: String) -> String
+mcp_approve_pairing(request_id: String) -> String
 ```
 
 Approve a pending pairing request. The client receives its credential when polling `GET /mcp/pair/:request_id`. Called by the host app when the user approves in the pairing UI.
 
-### mcpRejectPairing
+### mcp_reject_pairing
+
+(Flutter bridge: `mcpRejectPairing`)
 
 ```
-mcpRejectPairing(request_id: String) -> String
+mcp_reject_pairing(request_id: String) -> String
 ```
 
 Reject a pending pairing request. Called by the host app when the user rejects in the pairing UI.
 
-### mcpListPairedClients
+### mcp_list_paired_clients
+
+(Flutter bridge: `mcpListPairedClients`)
 
 ```
-mcpListPairedClients() -> String
+mcp_list_paired_clients() -> String
 ```
 
 Returns a JSON array of all paired clients with their metadata (client_id, client_name, agent_type, agent_instance_id, created_at, etc.).
 
-### mcpGetPendingPairingRequests
+### mcp_get_pending_pairing_requests
+
+(Flutter bridge: `mcpGetPendingPairingRequests`)
 
 ```
-mcpGetPendingPairingRequests() -> String
+mcp_get_pending_pairing_requests() -> String
 ```
 
 Returns a JSON array of pending pairing requests awaiting user approval (request_id, client_name, agent_type, agent_instance_id, requested_endpoint, workspace_hint, created_at, etc.).
 
-### mcpRevokePairedClient
+### mcp_revoke_paired_client
+
+(Flutter bridge: `mcpRevokePairedClient`)
 
 ```
-mcpRevokePairedClient(client_id: String) -> String
+mcp_revoke_paired_client(client_id: String) -> String
 ```
 
 Revoke a paired client. The client's credential is invalidated and the client can no longer connect.
 
-### mcpRotatePairedClient
+### mcp_rotate_paired_client
+
+(Flutter bridge: `mcpRotatePairedClient`)
 
 ```
-mcpRotatePairedClient(client_id: String) -> String
+mcp_rotate_paired_client(client_id: String) -> String
 ```
 
 Rotate a paired client's credential. Returns the new credential. The old credential is invalidated.
@@ -1905,40 +2197,13 @@ Rotate a paired client's credential. Returns the new credential. The old credent
 mcp_delete_paired_client(client_id: String) -> String
 ```
 
-Permanently delete a previously revoked paired client from the persistent registry. Unlike `mcpRevokePairedClient`, which keeps the entry for audit and can be reactivated by the user, `mcp_delete_paired_client` removes the row outright. Only operates on clients that are already revoked; returns an error JSON otherwise.
+Permanently delete a previously revoked paired client from the persistent registry. Unlike `mcp_revoke_paired_client`, which keeps the entry for audit and can be reactivated by the user, `mcp_delete_paired_client` removes the row outright. Only operates on clients that are already revoked; returns an error JSON otherwise.
 
-### MCP Tool Surface (24 tools)
+### MCP Tool Surface
 
-The MCP server currently exposes these tools from `mcp/handler.rs`:
+The MCP server exposes a subset of these RPCs as MCP tools from `mcp/handler.rs`. The canonical, authoritative list lives in [`MCP.md`](./MCP.md) (see "Tool Summary"). Per the observer-independence policy, mutating dismissal / observer-state RPCs are RPC-only and intentionally excluded from MCP tools (see `MCP.md` "Observer-Independence Policy").
 
-| Category | Tool |
-|----------|------|
-| Advisor | `advisor_get_todos` |
-| Advisor | `advisor_get_action_history` |
-| Advisor | `advisor_undo_action` |
-| Advisor | `advisor_undo_all_actions` |
-| Observation | `get_sessions` |
-| Observation | `get_anomalous_sessions` |
-| Observation | `get_blacklisted_sessions` |
-| Observation | `get_exceptions` |
-| Observation | `get_lan_devices` |
-| Observation | `get_lan_host_device` |
-| Observation | `get_breaches` |
-| Identity | `add_pwned_email` |
-| Identity | `remove_pwned_email` |
-| Identity | `get_pwned_emails` |
-| Configuration | `set_lan_auto_scan` |
-| Posture | `get_score` |
-| Agentic | `agentic_process_todos` |
-| Agentic | `agentic_execute_action` |
-| Agentic | `agentic_get_workflow_status` |
-| Divergence | `upsert_behavioral_model` |
-| Divergence | `get_behavioral_model` |
-| Divergence | `get_divergence_verdict` |
-| Divergence | `get_divergence_history` |
-| Divergence | `get_divergence_engine_status` |
-
-Lifecycle controls such as `start_divergence_engine` remain direct API/CLI operations and are intentionally excluded from MCP tools.
+Lifecycle controls such as `start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` remain direct API/CLI operations and are intentionally excluded from MCP tools.
 
 ---
 
