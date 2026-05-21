@@ -2027,6 +2027,8 @@ get_file_events() -> FimSnapshotAPI
 
 Return the rolling snapshot of recent FIM events (path, kind, timestamp, hash, writer process attribution when available). The snapshot is a bounded window; older events fall off as the buffer fills.
 
+The `hash` field is BLAKE3 over the file content and is populated **only when the event's `is_sensitive` flag is set** (i.e. the path matches `flodbadd::open_files::is_sensitive_path`). Non-sensitive events kept under a temp-staging root (`/tmp/`, `%TEMP%\AppData\Local\Temp\`, ...) or under an operator-supplied explicit watch root carry `hash == null` regardless of file size. This is intentional (FP-CI-2): hashing non-sensitive transient build artifacts on Windows races with build-tool exclusive opens, and the deterministic vulnerability detector only consumes `hash` for change-tracking of sensitive findings. `size` is always populated.
+
 ### get_file_monitor_status
 
 ```
