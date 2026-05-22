@@ -505,7 +505,7 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 25 | `get_divergence_engine_status` | Divergence | Divergence engine status (read-only) |
 | 26 | `get_vulnerability_findings` | Vulnerability | CVE-aligned heuristic findings (read-only) |
 | 27 | `get_vulnerability_detector_status` | Vulnerability | Detector runtime status (read-only) |
-| 28 | `get_vulnerability_history` | Vulnerability | Rolling history of vulnerability detector reports (read-only) |
+| 28 | `get_vulnerability_history` | Vulnerability | Rolling history of attack pattern detector reports (read-only) |
 | 29 | `list_agentic_dismissal_rules` | Dismissal | Read-only: active recurrence-aware dismissal rules with telemetry |
 | 30 | `list_agentic_dismissal_audit_log` | Dismissal | Read-only: audit log of dismissal-rule lifecycle events |
 
@@ -825,16 +825,16 @@ AI-powered security automation with multiple LLM providers.
 | `clear_divergence_state` | -- | void | Clear live divergence state |
 | `start_divergence_engine` | enabled: bool, interval_secs: u64 | String | Start/stop divergence engine (control plane) |
 | `get_divergence_engine_status` | -- | String | Get divergence engine runtime status |
-| `start_vulnerability_detector` | enabled: bool, interval_secs: u64 | String | Start/stop vulnerability detector |
+| `start_vulnerability_detector` | enabled: bool, interval_secs: u64 | String | Start/stop attack pattern detector |
 | `get_vulnerability_findings` | -- | String | Get latest vulnerability/safety-floor report |
-| `get_vulnerability_history` | limit: usize | String | Get vulnerability detector history |
+| `get_vulnerability_history` | limit: usize | String | Get attack pattern detector history |
 | `dismiss_vulnerability_finding` | finding_key: String | String | Dismiss vulnerability finding |
 | `undismiss_vulnerability_finding` | finding_key: String | String | Restore dismissed vulnerability finding |
-| `clear_vulnerability_history` | -- | void | Clear vulnerability detector history |
+| `clear_vulnerability_history` | -- | void | Clear attack pattern detector history |
 | `reset_vulnerability_suppressions` | -- | String | Reset every dismissed finding so it surfaces again |
 | `get_vulnerability_debug_trace` | report_id: String | String | Per-check evaluation trace for a specific report |
-| `debug_run_vulnerability_detector_tick` | -- | String | Force a vulnerability-detector tick (diagnostic) |
-| `get_vulnerability_detector_status` | -- | String | Get vulnerability detector runtime status |
+| `debug_run_vulnerability_detector_tick` | -- | String | Force an attack-pattern-detector tick (diagnostic) |
+| `get_vulnerability_detector_status` | -- | String | Get attack pattern detector runtime status |
 | `list_agent_plugins` | -- | String | List supported agent plugins (Cursor/Claude/...) |
 | `get_agent_plugin_status` | agent_type: String | String | Status of a specific agent plugin |
 | `provision_agent_plugin` | agent_type, workspace_root | String | Install or update an agent plugin |

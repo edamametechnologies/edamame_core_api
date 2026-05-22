@@ -1406,7 +1406,7 @@ Returns LLM token consumption statistics (input tokens, output tokens, total cos
 agentic_get_loop_token_usage() -> LoopTokenUsageAPI
 ```
 
-Returns per-loop LLM token usage broken down across the three agentic loops: `agentic` (todo auto-processing), `vuln` (vulnerability detector LLM adjudication), and `divergence` (divergence engine LLM adjudication, including the raw-session model ingest path). Each loop reports `*_in` and `*_out` token counts plus a shared `since_unix_secs` reset timestamp. Used to attribute LLM cost to the loop that generated it.
+Returns per-loop LLM token usage broken down across the three agentic loops: `agentic` (todo auto-processing), `vuln` (attack pattern detector LLM adjudication), and `divergence` (divergence engine LLM adjudication, including the raw-session model ingest path). Each loop reports `*_in` and `*_out` token counts plus a shared `since_unix_secs` reset timestamp. Used to attribute LLM cost to the loop that generated it.
 
 #### agentic_reset_loop_token_usage
 
@@ -1605,7 +1605,7 @@ get_divergence_verdict() -> String
 ```
 
 Get the latest divergence detection verdict as JSON.
-Includes evidence from deterministic correlation, safety-floor rules, and vulnerability-detection findings.
+Includes evidence from deterministic correlation, safety-floor rules, and attack-pattern-detection findings.
 
 #### get_divergence_history
 
@@ -1723,7 +1723,7 @@ Get engine status as JSON: running state, interval, last run timestamp, model ag
 
 `start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` are direct API control-plane methods and are not exposed via MCP tools.
 
-### Vulnerability Detector
+### Attack Pattern Detector
 
 Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag. Five checks: token_exfiltration (anomalous + creds), skill_supply_chain (blacklisted + creds), credential_harvest (any session + >= N credential label categories), sandbox_exploitation (suspicious lineage), gateway_binding (exposed listeners). The `credential_harvest` threshold is configurable via `credential_harvest_min_labels` in `cve-detection-params-db.json` (default 3).
 
@@ -1733,7 +1733,7 @@ Model-independent detection for sensitive-file access, critical CVE exposure, an
 start_vulnerability_detector(enabled: bool, interval_secs: u64) -> String
 ```
 
-Enable or disable the vulnerability detector with optional interval configuration. Returns status JSON.
+Enable or disable the attack pattern detector with optional interval configuration. Returns status JSON.
 
 #### get_vulnerability_findings
 
@@ -1749,7 +1749,7 @@ Get the latest active vulnerability / safety-floor report as JSON.
 get_vulnerability_history(limit: usize) -> String
 ```
 
-Get rolling history of vulnerability detector reports as JSON. `limit` caps the number of entries returned.
+Get rolling history of attack pattern detector reports as JSON. `limit` caps the number of entries returned.
 
 #### dismiss_vulnerability_finding
 
@@ -1773,7 +1773,7 @@ Restore a previously dismissed vulnerability or safety-floor finding by finding 
 clear_vulnerability_history() -> ()
 ```
 
-Clear stored vulnerability detector report history.
+Clear stored attack pattern detector report history.
 
 #### reset_vulnerability_suppressions
 
@@ -1805,9 +1805,93 @@ Get detector status as JSON: running state, interval, last run timestamp, and cu
 debug_run_vulnerability_detector_tick() -> String
 ```
 
-Force a single vulnerability-detector tick out of band (without waiting for the scheduled interval). Diagnostic-only; used by tests and the CLI when developers need a deterministic re-evaluation. Returns JSON describing whether a tick was actually executed (it may be skipped if a concurrent tick is already in flight).
+Force a single attack-pattern-detector tick out of band (without waiting for the scheduled interval). Diagnostic-only; used by tests and the CLI when developers need a deterministic re-evaluation. Returns JSON describing whether a tick was actually executed (it may be skipped if a concurrent tick is already in flight).
 
-**LLM dependency**: The vulnerability detector itself runs model-independent checks and does not require an LLM provider to surface findings. For CI/security gates and automation flows it is strongly recommended to also configure an LLM via `agentic_set_llm_config`: EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text. Without an LLM, raw heuristic findings still surface and gate consumers (e.g. `edamame_posture vulnerability-status --fail-on-findings`).
+**LLM dependency**: The attack pattern detector itself runs model-independent checks and does not require an LLM provider to surface findings. For CI/security gates and automation flows it is strongly recommended to also configure an LLM via `agentic_set_llm_config`: EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text. Without an LLM, raw heuristic findings still surface and gate consumers (e.g. `edamame_posture vulnerability-status --fail-on-findings`).
+
+#### Attack Pattern Detector RPC Aliases (preferred names; transition surface)
+
+We are transitioning the user-facing surface from "Vulnerability Detection" to "Attack Pattern Detection". The RPCs below are wire-level aliases of the corresponding `*_vulnerability_*` methods above. Each alias is a thin delegate to the legacy implementation (same arguments, same return shape, same behavior). New integrations should use the `attack_pattern_*` names; existing integrations using `*_vulnerability_*` continue to work. The legacy names will be deprecated in a future major version. See the workspace rule "Vulnerability -> Attack Pattern Detection Terminology Transition" in `edamame_app/.cursor/rules/workspace.mdc` for the full policy.
+
+#### start_attack_pattern_detector
+
+```
+start_attack_pattern_detector(enabled: bool, interval_secs: u64) -> String
+```
+
+Alias of `start_vulnerability_detector`.
+
+#### get_attack_pattern_findings
+
+```
+get_attack_pattern_findings() -> String
+```
+
+Alias of `get_vulnerability_findings`.
+
+#### get_attack_pattern_history
+
+```
+get_attack_pattern_history(limit: usize) -> String
+```
+
+Alias of `get_vulnerability_history`.
+
+#### dismiss_attack_pattern_finding
+
+```
+dismiss_attack_pattern_finding(finding_key: String) -> String
+```
+
+Alias of `dismiss_vulnerability_finding`.
+
+#### undismiss_attack_pattern_finding
+
+```
+undismiss_attack_pattern_finding(finding_key: String) -> String
+```
+
+Alias of `undismiss_vulnerability_finding`.
+
+#### clear_attack_pattern_history
+
+```
+clear_attack_pattern_history() -> ()
+```
+
+Alias of `clear_vulnerability_history`.
+
+#### reset_attack_pattern_suppressions
+
+```
+reset_attack_pattern_suppressions() -> String
+```
+
+Alias of `reset_vulnerability_suppressions`.
+
+#### get_attack_pattern_debug_trace
+
+```
+get_attack_pattern_debug_trace(report_id: String) -> String
+```
+
+Alias of `get_vulnerability_debug_trace`.
+
+#### get_attack_pattern_detector_status
+
+```
+get_attack_pattern_detector_status() -> String
+```
+
+Alias of `get_vulnerability_detector_status`.
+
+#### debug_run_attack_pattern_detector_tick
+
+```
+debug_run_attack_pattern_detector_tick() -> String
+```
+
+Alias of `debug_run_vulnerability_detector_tick`.
 
 ### Recurrence-Aware Dismissal Rules
 
@@ -1999,7 +2083,7 @@ Force a single observer tick for the given agent without waiting for the schedul
 
 ## File Integrity Monitoring (FIM)
 
-File integrity monitoring engine. Watches a configured set of paths for create / modify / rename / delete events, hashes content with BLAKE3 (subject to `fim_hash_size_threshold`), and feeds events into the vulnerability detector for sensitive-path / temp-staging analysis. Requires the `fim` feature flag.
+File integrity monitoring engine. Watches a configured set of paths for create / modify / rename / delete events, hashes content with BLAKE3 (subject to `fim_hash_size_threshold`), and feeds events into the attack pattern detector for sensitive-path / temp-staging analysis. Requires the `fim` feature flag.
 
 **Source**: `api/api_fim.rs`. See `FIM.md` in the core repo for the engine architecture and helper/standalone convergence story.
 
@@ -2027,7 +2111,7 @@ get_file_events() -> FimSnapshotAPI
 
 Return the rolling snapshot of recent FIM events (path, kind, timestamp, hash, writer process attribution when available). The snapshot is a bounded window; older events fall off as the buffer fills.
 
-The `hash` field is BLAKE3 over the file content and is populated **only when the event's `is_sensitive` flag is set** (i.e. the path matches `flodbadd::open_files::is_sensitive_path`). Non-sensitive events kept under a temp-staging root (`/tmp/`, `%TEMP%\AppData\Local\Temp\`, ...) or under an operator-supplied explicit watch root carry `hash == null` regardless of file size. This is intentional (FP-CI-2): hashing non-sensitive transient build artifacts on Windows races with build-tool exclusive opens, and the deterministic vulnerability detector only consumes `hash` for change-tracking of sensitive findings. `size` is always populated.
+The `hash` field is BLAKE3 over the file content and is populated **only when the event's `is_sensitive` flag is set** (i.e. the path matches `flodbadd::open_files::is_sensitive_path`). Non-sensitive events kept under a temp-staging root (`/tmp/`, `%TEMP%\AppData\Local\Temp\`, ...) or under an operator-supplied explicit watch root carry `hash == null` regardless of file size. This is intentional (FP-CI-2): hashing non-sensitive transient build artifacts on Windows races with build-tool exclusive opens, and the deterministic attack pattern detector only consumes `hash` for change-tracking of sensitive findings. `size` is always populated.
 
 ### get_file_monitor_status
 

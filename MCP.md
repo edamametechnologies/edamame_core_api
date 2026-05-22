@@ -14,7 +14,7 @@ Complete reference for all MCP (Model Context Protocol) tools exposed by EDAMAME
 EDAMAME implements a two-plane runtime monitoring architecture:
 
 - **Reasoning plane**: the LLM agent (Claude Desktop, Cursor, OpenClaw, etc.) declaring intent.
-- **System plane**: EDAMAME observing actual system behavior and producing security findings (vulnerability detector, divergence engine).
+- **System plane**: EDAMAME observing actual system behavior and producing security findings (attack pattern detector, divergence engine).
 
 For this architecture to be meaningful, the **observed** (the LLM agent) must not be able to silence findings about its **own** behavior. Otherwise an attacker who has compromised the agent could trivially dismiss the very findings that would catch them.
 
@@ -104,7 +104,7 @@ Poll pairing status. Returns JSON with `status` and optional `credential`:
 7. [LAN Scan Configuration Tools](#lan-scan-configuration-tools)
 8. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
 9. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
-10. [Vulnerability Detection Tools](#vulnerability-detection-tools)
+10. [Attack Pattern Detection Tools](#attack-pattern-detection-tools)
 11. [Recurrence-Aware Dismissal Rules (read-only)](#recurrence-aware-dismissal-rules-read-only)
 12. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
 13. [Server Management](#server-management)
@@ -396,7 +396,7 @@ Get the divergence engine runtime status: whether it is running, the configured 
 
 ---
 
-## Vulnerability Detection Tools
+## Attack Pattern Detection Tools
 
 Model-independent heuristic checks (CVE-aligned). Run on their own cadence, independent of the behavioral divergence engine. Five checks:
 
@@ -414,7 +414,7 @@ Get the latest vulnerability findings from model-independent heuristic checks. R
 
 ### `get_vulnerability_detector_status`
 
-Get the current status of the vulnerability detector: enabled state, evaluation interval, last run timestamp, and latest finding count.
+Get the current status of the attack pattern detector: enabled state, evaluation interval, last run timestamp, and latest finding count.
 
 **Parameters**: None
 
@@ -430,7 +430,7 @@ Get historical vulnerability reports (summaries, most recent first). Each entry 
 
 > **Observer-independence**: Mutation operations on vulnerability findings (`dismiss_vulnerability_finding`, `undismiss_vulnerability_finding`, `dismiss_vulnerability_finding_with_scope`, `clear_vulnerability_history`, `reset_vulnerability_suppressions`) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence vulnerability findings about its own behavior. Use the EDAMAME app (AI tab > Radar > Dismiss) or `edamame_cli rpc` for these operations.
 >
-> The vulnerability detector itself is model-independent and does not require an LLM provider. Findings will still surface (and gate consumers like `edamame_posture vulnerability-status --fail-on-findings`) without an LLM. For CI/security and chat workflows, configuring an LLM via `agentic_set_llm_config` is strongly recommended -- EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text.
+> The attack pattern detector itself is model-independent and does not require an LLM provider. Findings will still surface (and gate consumers like `edamame_posture vulnerability-status --fail-on-findings`) without an LLM. For CI/security and chat workflows, configuring an LLM via `agentic_set_llm_config` is strongly recommended -- EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text.
 
 ---
 
