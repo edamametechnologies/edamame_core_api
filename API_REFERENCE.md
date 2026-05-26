@@ -1893,6 +1893,41 @@ debug_run_attack_pattern_detector_tick() -> String
 
 Alias of `debug_run_vulnerability_detector_tick`.
 
+#### export_attack_pattern_finding_details
+
+```
+export_attack_pattern_finding_details(request_json: String) -> String
+```
+
+Export a neutral, consumer-agnostic diagnostic record for a single attack-pattern finding currently held in vulnerability history. The `request_json` envelope is `{ "finding_key": "<key>" }`. On success, returns:
+
+```json
+{
+  "success": true,
+  "details": {
+    "finding_key":      "<key>",
+    "finding":          { /* VulnerabilityFinding */ },
+    "report_id":        "<uuid>",
+    "report_timestamp": "<ISO8601>",
+    "debug_trace":      { /* VulnerabilityDebugTrace */ } | null,
+    "captured_at":      "<ISO8601>",
+    "core_version":     "<X.Y.Z>",
+    "platform":         "macos" | "linux" | "windows" | "ios" | "android",
+    "host_label":       "<hostname>"
+  }
+}
+```
+
+On failure, returns `{ "success": false, "error": "..." }`. The `debug_trace` field carries the full `VulnerabilityDebugTrace` (including the `input_snapshot` used for replay) when the daemon was started with `set_keep_history_debug_traces { keep: true }`, and `null` otherwise.
+
+This RPC is consumer-neutral by design. Known consumers:
+
+- **FP corpus capture**: piped through `edamame_core/tools/fp_corpus_from_export.sh <export.json> <FP-ID>` to produce a Shape A or Shape B entry under `edamame_core/tests/fp_corpus/<FP-ID>/`, replayed by `cargo test --test fp_replay`.
+- **Operator bug reports**: paste raw JSON into a JIRA / GitHub issue.
+- **Adversarial regression fixtures**: copy raw JSON into the adversarial test corpus.
+- **Support escalation**: customer attaches raw JSON to a support ticket for offline replay.
+- **Detector forensics**: `jq '.details.debug_trace.llm_decision'` to inspect past LLM adjudication.
+
 ### Recurrence-Aware Dismissal Rules
 
 Operator-only dismissal-rule plane: every `agentic_*_dismissal*` RPC mutates EDAMAME's local dismissal store and is **not** exposed via MCP (per the observer-independence policy). Rules dismiss vulnerability or divergence findings under explicit scopes (`finding`, `process_for_check`, `process_lineage`, `process_and_material_class`, `agent_workspace_pattern`) with optional TTL and a severity ceiling that controls whether the rule may suppress CRITICAL findings.
@@ -1927,7 +1962,7 @@ Returns `{ "success": bool, "rule_id"?: string, "error"?: string }`.
 agentic_dismiss_with_scope(request_json: String) -> String
 ```
 
-Convenience wrapper around `agentic_add_dismissal_rule`: dismiss a single finding under a chosen scope, auto-filling the matcher when `scope = "finding"`. The `request_json` envelope mirrors `agentic_add_dismissal_rule` plus a top-level `finding_key`. Returns `{ "success": bool, "rule_id"?: string, "error"?: string }`.
+Convenience wrapper around `agentic_add_dismissal_rule`: dismiss a single finding under a chosen scope, auto-filling the matcher when `scope = "finding"`. The `request_json` envelope mirrors `agentic_add_dismissal_rule` plus a top-level `finding_key`. Returns `{ "success": bool, "error"?: string }`. The previously returned `rule_id` field was structurally dead (no consumer read it) and has been removed; the underlying rule is still persisted internally and accessible via `agentic_get_dismissal_rules`.
 
 #### agentic_report_dismissal
 
@@ -2078,6 +2113,20 @@ run_transcript_observer_tick_for(agent_type: String) -> String
 ```
 
 Force a single observer tick for the given agent without waiting for the scheduled interval. Used by tests and the CLI when developers need a deterministic re-evaluation. Returns the updated observer-status JSON, or an error JSON when the agent type is unknown.
+
+#### get_raw_agent_activity
+
+```
+get_raw_agent_activity(agent_type: String, active_window_minutes: u64, limit: u32) -> String
+```
+
+Returns the JSON-serialized `CollectResult` produced by the foundation transcript parser (`edamame_foundation::agent_transcripts::collect`) for the given agent -- the same pre-LLM payload that feeds `upsert_behavioral_model_from_raw_sessions` in the transcript observer tick, but without any LLM call. This is the operator surface for inspecting deterministic agent activity (chat text, tool invocations, derived `expected_*` hints) when no LLM provider is configured, or when the caller wants the raw parser view instead of the extrapolated `BehavioralWindow` returned by `get_behavioral_model` / `get_behavioral_model_contributors`.
+
+`agent_type` is one of `cursor`, `claude_code`, `claude_desktop`, `codex`, `openclaw`. Unknown agent types return an empty payload + diagnostics (`transcripts_root_accessible: false`) rather than an error so operator-side discovery probing is well-defined.
+
+Windowing matches the LLM ingest path: the parser keeps the most recently modified `limit` sessions whose mtime falls within the last `active_window_minutes`. Pass `0` for either parameter to fall back to the observer defaults (`limit=3`, `active_window_minutes=30`). On the macOS app path the call crosses the sandbox via the helper daemon; on standalone / posture CLI it reads the user's real home directory directly.
+
+The returned JSON has shape `{ "payload": CollectedPayload, "diagnostics": CollectDiagnostics }`. `payload.sessions[*].derived_expected_traffic` / `derived_expected_file_access` / `derived_expected_commands` carry the deterministic hints the parser was able to extract from `user_text` / `assistant_text` / tool invocations; the LLM extrapolation step adds the broader `expected_*` / `not_expected_*` slices on top of these hints when a provider is configured.
 
 ---
 
