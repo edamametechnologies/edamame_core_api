@@ -159,6 +159,23 @@ self.state.read().await.event_manager.trigger_event(CoreEvent::ScoreCompleted);
 | `DivergenceDetected` | 2199023255552 | Fired when the divergence verdict is DIVERGENCE |
 | `DivergenceClean` | 4398046511104 | Fired when verdict returns to CLEAN after a previous DIVERGENCE |
 | `DivergenceUpdated` | 17592186044416 | Fired when live divergence or vulnerability-monitor state changes |
+| `VulnerabilityUpdated` | 140737488355328 | Attack pattern detector (vulnerability monitor) findings changed |
+| `AgenticNotificationUpdated` | 562949953421312 | Agentic notification state changed |
+| `AgenticTranscriptObserverUpdated` | 1125899906842624 | External transcript observer state changed (per-agent pause/resume, push) |
+| `AgenticDismissalRuleUpdated` | 2251799813685248 | Recurrence-aware dismissal rules changed |
+
+### MCP Events
+
+| Event | Value | Description |
+|-------|-------|-------------|
+| `McpPairingRequested` | 35184372088832 | An MCP client requested pairing with the daemon |
+| `McpPairingUpdated` | 70368744177664 | MCP pairing state changed (approved, revoked, expired) |
+
+### File Integrity (FIM) Events
+
+| Event | Value | Description |
+|-------|-------|-------------|
+| `FileEventsUpdated` | 281474976710656 | File integrity monitoring (FIM) events updated |
 
 ## Event Mask Examples
 

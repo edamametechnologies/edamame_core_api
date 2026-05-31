@@ -314,7 +314,7 @@ Events are delivered to all registered consumers:
 - **gRPC**: Server-streaming RPC (`subscribe_to_events`)
 - **Internal**: `mpsc::Sender` channels for in-process listeners
 
-### Event Definitions (45 events)
+### Event Definitions (52 events)
 
 See [EVENTS.md](EVENTS.md) for the complete event reference.
 
@@ -472,7 +472,7 @@ edamame_posture background-mcp-generate-psk
 
 For the EDAMAME Security desktop app, configure credentials under AI tab > MCP Server Settings (pairing UI or shared PSK).
 
-### MCP Tools Exposed (28 tools)
+### MCP Tools Exposed (33 tools)
 
 See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, return types, and L7 session field documentation.
 
@@ -508,6 +508,9 @@ See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, retur
 | 28 | `get_vulnerability_history` | Vulnerability | Rolling history of attack pattern detector reports (read-only) |
 | 29 | `list_agentic_dismissal_rules` | Dismissal | Read-only: active recurrence-aware dismissal rules with telemetry |
 | 30 | `list_agentic_dismissal_audit_log` | Dismissal | Read-only: audit log of dismissal-rule lifecycle events |
+| 31 | `get_file_events` | FIM | Recent FIM events snapshot |
+| 32 | `get_file_monitor_status` | FIM | FIM watcher running state and roots |
+| 33 | `get_file_event_summary` | FIM | Aggregated FIM event summary |
 
 > **Observer-independence policy** (CRITICAL): The reasoning plane (LLM agent) must not be
 > able to silence security findings about its own behavior. Therefore, the MCP surface for
