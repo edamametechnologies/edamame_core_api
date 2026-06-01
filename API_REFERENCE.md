@@ -462,6 +462,14 @@ get_analyzer_stats() -> AnalyzerStatsAPI
 
 Returns ML anomaly analyzer statistics (model state, feature distributions, etc.).
 
+#### get_scan_stats
+
+```
+get_scan_stats() -> ScanStatsAPI
+```
+
+Returns LAN-scan lifecycle status (in-progress, progress percent, last scan / last gateway scan timestamps, auto-scan, consent, deep/wide flags, device counts) together with a snapshot of the adaptive scan-rate governor (`ScanGovernorStatsAPI`): targets tracked, throttled count, per-target concurrency pool size, minimum rate factor, and the throttled targets with their per-target rate factor, concurrency limit, baseline RTT, and last-active age.
+
 #### set_percentiles
 
 ```
