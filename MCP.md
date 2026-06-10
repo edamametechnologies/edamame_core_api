@@ -25,6 +25,13 @@ The MCP tool surface therefore enforces a strict read-only contract for security
 | Read divergence verdicts / history / engine status | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read vulnerability findings / history / detector status | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read active dismissal rules + audit log | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Read agent visibility (MCP inventory, SBOM + drift, capability graph + reachability, recursion, flight recorder, drift timelines, data-flow / memory / A2A maps, alignment rollup, firewall status/receipts, response catalog/history, policy pack/evaluation/attestations, zone promotions, agent inventory) | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Refresh any visibility domain / set capture tier | **NO** | EDAMAME app (Agents tab), edamame_cli RPC |
+| Approve / revoke an agent, promote an SBOM baseline | **NO** | EDAMAME app (Agents tab), edamame_cli RPC |
+| Set tool-call firewall mode (recommend/confirm/block) | **NO** | EDAMAME app, edamame_cli RPC |
+| Request / undo a response action, export a case bundle | **NO** | EDAMAME app, edamame_cli RPC |
+| Set policy pack / attest evaluation or SBOM | **NO** | EDAMAME app, edamame_cli RPC |
+| Request / decide a cross-zone promotion | **NO** | EDAMAME app, edamame_cli RPC |
 | Dismiss a vulnerability finding | **NO** | EDAMAME app (AI tab > Radar > Dismiss), edamame_cli RPC |
 | Undismiss a vulnerability finding | **NO** | EDAMAME app, edamame_cli RPC |
 | Dismiss a divergence evidence group | **NO** | EDAMAME app (AI tab > Brain Scan > Dismiss), edamame_cli RPC |
@@ -481,6 +488,204 @@ Useful for incident review and explaining "why didn't I see this finding?".
 
 ---
 
+## Agent Visibility Tools
+
+Read-only structural visibility into the agents running on this host, spanning the full staged roadmap (Stage A discovery through Stage D+ governance): the MCP attack surface, per-agent software bill-of-materials, the capability graph and trust-zone reachability, recursion/delegation risk, the hash-chained run flight recorder, goal/delegation drift timelines, sensitive data-flow / memory / agent-to-agent maps, the composite alignment rollup, the tool-call firewall status and receipts, the ADR response-action catalog and history, and the enterprise policy pack / evaluation / attestations / cross-zone promotion log. Each tool lazily ensures a fresh snapshot before returning. All output is **metadata-only** -- it never includes secret values, credential bodies, or transcript content (only structural markers and goal hashes are derived). Requires the `agentic` feature flag.
+
+These tools share their names and behavior with the corresponding RPC methods documented in [API_REFERENCE.md](API_REFERENCE.md#agent-visibility); the MCP exposure is read-only by design (observer-independence I1). Every mutator -- `refresh_*`, `set_visibility_capture_tier`, `set_firewall_mode`, `approve_agent` / `revoke_agent_approval` / `approve_agent_sbom_baseline`, `request_response_action` / `undo_response_action` / `export_visibility_case`, `set_policy_pack`, `attest_policy_evaluation` / `attest_agent_sbom`, `request_zone_promotion` / `decide_zone_promotion` -- plus the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`, `get_visibility_roadmap`) are operator/UI control-plane only and are intentionally **not** exposed as MCP tools. An observed agent can read every structural finding about itself but cannot weaken, silence, or self-approve the controls that watch it.
+
+### `get_mcp_inventory`
+
+READ-ONLY. Discover every MCP server configured for any supported agent on this host (the host's MCP attack surface). Returns the inventory: each endpoint has `transport` (stdio/http/sse/ws), `exposure_scope`, `auth_strength`, `tool_privilege_classes`, plus deterministic risk findings (e.g. a public endpoint with no auth). Metadata-only -- never includes secret values or file bodies.
+
+**Parameters**: None
+
+### `get_mcp_findings`
+
+READ-ONLY. List just the deterministic MCP risk findings (no endpoint inventory). Each finding has a stable `finding_key`, `domain` = `mcp`, `rule_id`, `severity` (INFO/LOW/MEDIUM/HIGH/CRITICAL), `title`, `description`, `subject_id`, and metadata-only evidence. HIGH/CRITICAL findings are alertable.
+
+**Parameters**: None
+
+### `get_agent_sboms`
+
+READ-ONLY. Get the agent software bill-of-materials (SBOM) for every discovered agent: components (the agent app, each MCP server it connects to, tool classes, models) and their dependency edges. CycloneDX-shaped projection derived from live discovery. Metadata-only.
+
+**Parameters**: None
+
+### `get_agent_sbom_cyclonedx`
+
+READ-ONLY. Export one agent's SBOM as standard CycloneDX JSON (for ingestion by external SBOM/SCA tooling). Returns `{}` when no SBOM exists for that agent.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `agent_type` | string | Yes | Agent type to export (e.g. `cursor`, `claude_code`, `openclaw`) |
+
+### `get_capability_graph`
+
+READ-ONLY. Get the agent capability graph: edges between agents, MCP servers, tool classes, network endpoints, files, and models. Each edge has `src`/`dst` type+id, `edge_type` (`declares`/`exposes`/`connects_to`/...), and `confidence` (`declared` = config-only latent capability, `observed` = corroborated by live telemetry). Reveals the effective vs latent capability surface.
+
+**Parameters**: None
+
+### `get_recursion_risk`
+
+READ-ONLY. Get per-agent recursion/delegation analysis derived from agent transcripts: a delegation tree per agent with `max_depth`, `total_nodes`, `loop_detected` (a repeated goal recurring at increasing depth), and findings. Surfaces runaway recursive-spawn / delegation-loop risk. Metadata-only -- only structural spawn markers and goal hashes are derived, never transcript bodies.
+
+**Parameters**: None
+
+### `get_agent_inventory`
+
+READ-ONLY. Operator inventory of every supported agent with any footprint on this host. Each entry has `agent_type`, `display_name`, a `classification` (`approved`/`shadow`/`unmanaged`/`unknown`), the installed/discovered/observer_enabled/approved booleans, and per-agent `mcp_endpoint_count`, `sbom_component_count`, `alertable_finding_count`. The reasoning plane can read its own classification but cannot change the operator allow-list. Metadata-only.
+
+**Parameters**: None
+
+### `get_graph_reachability`
+
+READ-ONLY. Per-agent trust-zone reachability over the declared capability graph. Trust zones: `trust0` (agent identity), `trust1` (local service boundary -- stdio/loopback MCP servers, tool classes), `trust2` (untrusted surface -- LAN/public/unknown). Each entry has `agent_type`, `reachable_node_count`, `max_zone`, `crosses_to_untrusted`, and `boundary_edge_ids`. Surfaces which agents can pivot from their identity out to an untrusted network surface.
+
+**Parameters**: None
+
+### `get_effective_capabilities`
+
+READ-ONLY. Per-agent effective (transitively reachable) capabilities over the declared capability graph. Each entry has `agent_type`, the deduped `capabilities` set (human-readable labels e.g. `Shell`, `Git`), `high_privilege` (a filesystem/shell/network-class capability is reachable), and `reaches_untrusted` (a trust2 node is reachable). Reveals the real capability surface beyond directly-declared tools.
+
+**Parameters**: None
+
+### `list_recent_runs`
+
+READ-ONLY. List the recorded reasoning runs (the flight-recorder index). Each summary has `run_id` (`agent_type::agent_instance_id::session_key`), timestamps, event/alertable counts, max severity, and a chain-valid flag. Pass a `run_id` to `get_run_provenance` for the full record.
+
+**Parameters**: None
+
+### `get_run_provenance`
+
+READ-ONLY. Get the full flight record for one run: the ordered, replayable, hash-chained event stream (`session_start` -> `tool_call`/`command`/`expected_egress` -> `divergence_verdict` -> `divergence_evidence` -> `session_end`), each event carrying plane/kind/summary/severity and `prev_hash`/`hash` chain links, plus the causal edges and `max_severity`/`alertable_event_count`/`chain_valid`. Returns `{}` when the run is unknown. Metadata-only.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `run_id` | string | Yes | Run id from `list_recent_runs` |
+
+### `explain_run_event`
+
+READ-ONLY. Prove why a single recorded event happened: returns the causal backtrace (chronological ancestor chain walked transitively into the target), the downstream descendants, the edges traversed, `backtrace_complete`, and `chain_valid`. This is the recorder's prove-why for any divergence evidence or declared action. Metadata-only.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `run_id` | string | Yes | Run id from `list_recent_runs` |
+| `event_id` | string | Yes | Event id within the run (from `get_run_provenance`) |
+
+### `get_agent_drift`
+
+READ-ONLY. List per-agent goal/delegation drift timelines, highest peak drift first. Each agent (keyed `agent_key` = `agent_type::agent_instance_id`) carries its ordered drift events (category, point-in-time `drift_score` 0-100, severity, backing divergence finding keys), `peak_drift_score`, `current_drift_score`, and whether it is currently diverging. Drift is a deterministic re-projection of divergence history -- not a new judgement. Metadata-only.
+
+**Parameters**: None
+
+### `get_agent_drift_timeline`
+
+READ-ONLY. Get one agent's full drift timeline: the ordered drift events with per-event `drift_score`/severity/category, backing divergence finding keys and process paths, plus peak/current scores and the delegation summary. Returns `{}` when the agent is unknown. Metadata-only.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `agent_key` | string | Yes | Agent key from `get_agent_drift` |
+
+### `explain_agent_drift`
+
+READ-ONLY. Prove why a single drift event fired: returns the category and score band, the contributing divergence findings, the prior verdict state it moved from, and a human-readable rationale of which signals drove the score. Metadata-only.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `agent_key` | string | Yes | Agent key from `get_agent_drift` |
+| `event_id` | string | Yes | Drift event id (from `get_agent_drift_timeline`) |
+
+### `get_dataflow_maps`
+
+READ-ONLY. Per-agent latent `source -> sink` data-flow maps (credential store, file, network egress, ...), each edge marked `latent` (config-derived) or `observed` (corroborated by divergence taint evidence), with a severity for sensitive-sink reach. Metadata-only.
+
+**Parameters**: None
+
+### `get_dataflow_map`
+
+READ-ONLY. One agent's data-flow map. Returns `{}` when no map exists for that agent.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `agent_type` | string | Yes | Agent type (e.g. `cursor`) |
+
+### `get_memory_inventory`
+
+READ-ONLY. The memory/RAG inventory: discovered persistent context stores (vector DBs, memory files, RAG corpora) each agent can read/write, with scope and a poisoning-risk severity. Metadata-only.
+
+**Parameters**: None
+
+### `get_alignment_rollup`
+
+READ-ONLY. The composite alignment rollup: the 0-100 `score`, the `band` (`aligned`/`drifting`/`misaligned`/`critical`), `hard_fail` (a catastrophic domain forces failure regardless of score), and the per-domain contribution breakdown. The single headline "how aligned are the agents on this host" number.
+
+**Parameters**: None
+
+### `get_firewall_status`
+
+READ-ONLY. The tool-call firewall status envelope: current `mode` (`recommend`/`confirm`/`block`), `receipt_count`, `alertable_count`, `catastrophic_count`, `pending_confirmation_count`, `chain_intact`, `first_broken_index`, and `chain_head_hash`. Reading the mode does not let the agent change it (`set_firewall_mode` is operator-only).
+
+**Parameters**: None
+
+### `get_firewall_evaluations`
+
+READ-ONLY. The hash-chained tool-call firewall receipts: per evaluated tool call the verdict (`allow`/`recommend`/`confirm`/`block`), severity, catastrophic flag, triggering rule, `resolved` state, and `prev_hash`/`receipt_hash` chain links. Metadata-only.
+
+**Parameters**: None
+
+### `get_response_action_catalog`
+
+READ-ONLY. The catalog of available response-action kinds: each kind with its target class, whether it is reversible, and whether it requires a prior simulate run. Requesting an action (`request_response_action`) is operator-only.
+
+**Parameters**: None
+
+### `get_response_action_history`
+
+READ-ONLY. The append-only response-action history: each requested/simulated/applied/undone action with kind, target, reason, simulated flag, timestamps, and outcome. Metadata-only.
+
+**Parameters**: None
+
+### `get_policy_pack`
+
+READ-ONLY. The active enterprise policy pack: `pack_id`, `version`, and the declarative rules (each with kind, parameters, and the severity of a violation). Defaults to the built-in `EDAMAME Baseline` pack. Changing the pack (`set_policy_pack`) is operator-only.
+
+**Parameters**: None
+
+### `get_policy_evaluation`
+
+READ-ONLY. The most recent policy-pack evaluation: overall `compliant` flag, `violated_rules`/`total_rules` counts, and a per-rule pass/fail result with the deterministic inputs that drove each verdict.
+
+**Parameters**: None
+
+### `get_policy_attestations`
+
+READ-ONLY. The attestation log: each tamper-evident attestation with its subject (policy evaluation or agent SBOM), the SHA-256 `content_digest`, and the timestamp. Producing an attestation (`attest_policy_evaluation`/`attest_agent_sbom`) is operator-only.
+
+**Parameters**: None
+
+### `get_zone_promotions`
+
+READ-ONLY. The cross-zone promotion log: each operator request to let an agent operate in a more-trusted firewall origin zone, with `promotion_id`, agent, target zone, reason, status (`requested`/`approved`/`denied`), and decision timestamp. Requesting/deciding a promotion is operator-only -- an observed agent cannot self-promote.
+
+**Parameters**: None
+
+> **Observer-independence**: The visibility control-plane mutators (every `refresh_*`, `set_visibility_capture_tier`, `set_firewall_mode`, `approve_agent`, `revoke_agent_approval`, `approve_agent_sbom_baseline`, `request_response_action`, `undo_response_action`, `export_visibility_case`, `set_policy_pack`, `attest_policy_evaluation`, `attest_agent_sbom`, `request_zone_promotion`, `decide_zone_promotion`) and the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`, `get_visibility_roadmap`) are intentionally **not** exposed via MCP. Refresh is implicit (lazy TTL); enforcement, governance, and capture-tier are operator/UI surfaces. Use the EDAMAME app (Agents tab) or `edamame_cli rpc` for those.
+
+---
+
 ## L7 Session Enrichment Fields
 
 Every network session returned by `get_sessions`, `get_anomalous_sessions`, `get_blacklisted_sessions`, and `get_exceptions` includes deep Layer 7 process attribution. These fields enable detection of process masquerading, script-based attacks, and unauthorized file access.
@@ -646,3 +851,30 @@ Use a per-client credential (from pairing) or shared PSK:
 | 31 | `get_file_events` | FIM | Recent FIM events snapshot |
 | 32 | `get_file_monitor_status` | FIM | FIM watcher running state and roots |
 | 33 | `get_file_event_summary` | FIM | Aggregated FIM event summary |
+| 34 | `get_mcp_inventory` | Visibility | Discovered MCP attack surface (read-only) |
+| 35 | `get_mcp_findings` | Visibility | Deterministic MCP risk findings (read-only) |
+| 36 | `get_agent_sboms` | Visibility | Per-agent software bill-of-materials (read-only) |
+| 37 | `get_agent_sbom_cyclonedx` | Visibility | One agent's SBOM as CycloneDX JSON (read-only) |
+| 38 | `get_capability_graph` | Visibility | Agent capability graph edges (read-only) |
+| 39 | `get_recursion_risk` | Visibility | Recursion/delegation tree risk (read-only) |
+| 40 | `get_agent_inventory` | Visibility | Agent inventory + shadow classification (read-only) |
+| 41 | `get_graph_reachability` | Visibility | Per-agent trust-zone reachability (read-only) |
+| 42 | `get_effective_capabilities` | Visibility | Per-agent transitive capabilities (read-only) |
+| 43 | `list_recent_runs` | Visibility | Flight-recorder run index (read-only) |
+| 44 | `get_run_provenance` | Visibility | Full hash-chained run flight record (read-only) |
+| 45 | `explain_run_event` | Visibility | Causal backtrace for one run event (read-only) |
+| 46 | `get_agent_drift` | Visibility | Per-agent goal/delegation drift timelines (read-only) |
+| 47 | `get_agent_drift_timeline` | Visibility | One agent's full drift timeline (read-only) |
+| 48 | `explain_agent_drift` | Visibility | Prove-why for one drift event (read-only) |
+| 49 | `get_dataflow_maps` | Visibility | Per-agent source->sink data-flow maps (read-only) |
+| 50 | `get_dataflow_map` | Visibility | One agent's data-flow map (read-only) |
+| 51 | `get_memory_inventory` | Visibility | Agent memory/RAG store inventory (read-only) |
+| 52 | `get_alignment_rollup` | Visibility | Composite alignment score + bands (read-only) |
+| 53 | `get_firewall_status` | Visibility | Tool-call firewall status envelope (read-only) |
+| 54 | `get_firewall_evaluations` | Visibility | Hash-chained firewall receipts (read-only) |
+| 55 | `get_response_action_catalog` | Visibility | Response-action kinds catalog (read-only) |
+| 56 | `get_response_action_history` | Visibility | Response-action history (read-only) |
+| 57 | `get_policy_pack` | Visibility | Active enterprise policy pack (read-only) |
+| 58 | `get_policy_evaluation` | Visibility | Latest policy-pack evaluation (read-only) |
+| 59 | `get_policy_attestations` | Visibility | Tamper-evident attestation log (read-only) |
+| 60 | `get_zone_promotions` | Visibility | Cross-zone promotion log (read-only) |
