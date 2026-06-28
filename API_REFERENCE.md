@@ -19,6 +19,7 @@ Methods are organized by API domain. Health-related methods are omitted from thi
 - [Trust & Compliance](#trust--compliance)
 - [Advisor](#advisor)
 - [Agentic / AI Automation](#agentic--ai-automation)
+- [Metrics History](#metrics-history)
 - [File Integrity Monitoring (FIM)](#file-integrity-monitoring-fim)
 - [Privacy](#privacy)
 - [Agent Visibility](#agent-visibility)
@@ -2137,6 +2138,42 @@ Windowing matches the LLM ingest path: the parser keeps the most recently modifi
 
 The returned JSON has shape `{ "payload": CollectedPayload, "diagnostics": CollectDiagnostics }`. `payload.sessions[*].derived_expected_traffic` / `derived_expected_file_access` / `derived_expected_commands` carry the deterministic hints the parser was able to extract from `user_text` / `assistant_text` / tool invocations; the LLM extrapolation step adds the broader `expected_*` / `not_expected_*` slices on top of these hints when a provider is configured.
 
+### Agent Economics & Model Usage
+
+LLM-free economics reads over the same transcripts the observer parses, plus EDAMAME's own configured-provider call telemetry. These back the Agents tab History subtab and the `background-model-usage-summary` / economics posture commands. No LLM call is made to produce them.
+
+#### get_agent_run_economics
+
+```
+get_agent_run_economics(active_window_minutes: u64, limit: u32) -> String
+```
+
+Returns the JSON-serialized per-agent run economics over the window: per agent the token volume (input/output/total), an estimated dollar cost, and per-session breakdowns parsed from the agent's own transcripts. Token figures are exact when the transcript carries usage metadata; the dollar conversion comes from the embedded per-model price table (`cost_is_estimate`). Agents whose transcripts carry no usage (e.g. Cursor's `.txt` export) report `has_token_data = false`. Pass `0` for either parameter to use the economics defaults (24h window, 25 sessions per agent). Dispatch mirrors `get_raw_agent_activity`: the macOS app path crosses the sandbox via the helper per agent; standalone / posture CLI calls the foundation parser directly.
+
+#### get_model_usage_summary
+
+```
+get_model_usage_summary(window_minutes: u64) -> String
+```
+
+Returns the JSON-serialized `ModelUsageSummary` -- a cross-agent, per-model usage table unioning two fidelity tiers. The **transcript-derived** tier (every observed agent, passive, APPROXIMATE) carries per-model token volume, estimated dollar cost, and per-turn responsiveness (latency / tokens-per-sec / inferred provider errors) parsed from transcripts. The **measured** tier (EDAMAME's own configured-provider calls, PRECISE) carries per-model call count, availability (success / total), latency, retries, and true output tokens/sec read from the durable metrics-history `llm_*_by_model` families. Each model row carries whichever tiers had data, tagged by `sources`, so a consumer never confuses a measured availability figure with an approximate transcript-derived one. Dollar figures are estimates (`cost_is_estimate`). Pass `0` for `window_minutes` to use the 24h default; the measured tier reads hourly granularity for windows up to ~14 days and daily beyond that.
+
+---
+
+## Metrics History
+
+Read-only projection of the durable metrics-history time-series database (TSDB). The core's `metrics_rollup_task` folds per-agent and per-session telemetry into bounded `hourly` and `daily` buckets (token/cost by model and agent, LLM and MCP calls, network bytes in/out by domain, file events by type, ...), persisted to user-space storage with a retention policy. This is the LLM-free backend for the Agents tab History subtab Trends charts and the measured tier of `get_model_usage_summary`. Requires the `agentic` feature flag.
+
+**Source**: `api/api_metrics.rs`. See `AGENTIC.md` ("Metrics history") in the core repo for the rollup families and retention model.
+
+### get_metrics_history
+
+```
+get_metrics_history(family: String, granularity: String, range_minutes: u64) -> String
+```
+
+Return the matching metric buckets as a JSON-serialized `MetricsHistoryAPI`: the echoed query (`family`, `granularity`, `range_minutes`, `generated_at`) plus `buckets` (ascending by `start`). Each bucket carries its aligned `start` instant and a `series` array of `{ family, dimension, sum, count, min, max, avg }` entries (`min`/`max` populated only for gauge families; counters leave them `null`). `family = ""` (or `"all"`) returns every family; otherwise pass a canonical family name (e.g. `tokens_input_by_model`, `est_cost_usd_by_agent`, `llm_calls_by_model`, `mcp_calls_by_server`, `net_bytes_in_by_domain`, `net_bytes_out_by_domain`, `files_by_event_type`). `granularity` accepts `hourly` / `daily` (aliases `hour`/`h`, `day`/`d`); an unrecognized granularity returns an `{"error": ...}` object rather than throwing, so callers always get parseable output. `range_minutes` bounds the look-back window from now.
+
 ---
 
 ## File Integrity Monitoring (FIM)
@@ -2357,6 +2394,14 @@ get_effective_capabilities() -> String
 
 (INC-10) Return per-agent effective (transitively reachable) capability classes over the declared capability graph as a JSON array. Each entry carries `agent_type`, the deduped human-readable `capabilities` set (e.g. `Shell`, `Git`), `high_privilege` (a filesystem/shell/network-class capability is reachable), and `reaches_untrusted` (a trust2 node is reachable). Reveals the real capability surface beyond an agent's directly-declared tools. Lazily ensures a fresh structural snapshot.
 
+### get_host_blast_radius
+
+```
+get_host_blast_radius() -> String
+```
+
+(C3 / INC-10) Return the host blast-radius bundle as a JSON envelope -- `host_privilege` (the shared host-privilege assessment: admin membership / passwordless-root / elevated session), `agent_sandboxes` (per-agent OS-confinement assessment), `harnesses` (one entry per known AI-SDLC governance harness -- AgentField, Rippletide, ... -- each with a `detected` flag plus the on-disk evidence that matched), and `blast_radius_agents` (the canonical per-agent blast-radius verdicts, the same deterministic rule the score threat uses, scoped to the present sandboxes). Answers "if any agent here is compromised, what can it reach on this machine without further authentication, is it OS-confined, and is it wrapped by a governance harness?". Informational, never alertable.
+
 ### get_recursion_risk
 
 ```
@@ -2396,6 +2441,22 @@ explain_run_event(run_id: String, event_id: String) -> String
 ```
 
 (INC-5) Prove why one recorded event happened: returns the causal backtrace (chronological ancestor chain walked transitively into the target), the downstream descendants, the edges traversed, `backtrace_complete`, and `chain_valid`. Returns `{}` when the run/event is unknown.
+
+### list_structural_runs
+
+```
+list_structural_runs() -> String
+```
+
+LLM-free structural flight recorder index. Returns a JSON array of run summaries projected directly from raw agent transcripts -- the reasoning-plane session lifecycle (session start -> tool calls / commands / declared egress -> session end) with NO divergence correlation and NO behavioral-model predictions. This is the LLM-free Agents-tab counterpart to the divergence-correlated `list_recent_runs`. Built on demand (like `get_agent_run_economics`); no refresh mutator. Observer-independence (I1): exposed as a read-only MCP tool.
+
+### get_structural_run_provenance
+
+```
+get_structural_run_provenance(run_id: String) -> String
+```
+
+Return the full structural flight record for one run as JSON (pass a `run_id` from `list_structural_runs`): the ordered, replayable event stream projected from the transcript, with NO divergence verdicts or behavioral-model predictions. Returns `{}` when the run is unknown. Read-only MCP-safe (I1).
 
 ### refresh_agent_drift
 
@@ -2500,6 +2561,22 @@ get_alignment_rollup() -> String
 ```
 
 (INC-12) Return the composite alignment rollup as JSON: the 0-100 `score`, the `band` (`aligned`/`drifting`/`misaligned`/`critical`), `hard_fail` (a catastrophic domain forces failure regardless of score), and the per-domain contribution breakdown. This is the single headline number for "how aligned are the agents on this host".
+
+### get_owasp_scorecard
+
+```
+get_owasp_scorecard() -> String
+```
+
+Return the OWASP GenAI crosswalk scorecard as JSON: static per-category coverage grades (from `OWASPGENAI.md`) plus live finding attribution parsed from the `OWASP-<id>` reference tokens already carried by visibility and attack-pattern findings, with the headline reused from the alignment rollup. Read-only, derived; no separate refresh. MCP-safe read.
+
+### get_agent_subprocess_usage
+
+```
+get_agent_subprocess_usage() -> String
+```
+
+Return agent critical-subprocess usage as JSON -- read-only, derived, LLM-free. Reveals which discovered agents are/have been spawning `ssh`/`scp`/`nc`/shells/`docker`/... by classifying the L7 process lineage on captured sessions and attributing it to a known agent identity. Findings are capped at MEDIUM (reveal, not alert) and demo-guarded in the CoreManager method. MCP-safe read.
 
 ### get_firewall_status
 
