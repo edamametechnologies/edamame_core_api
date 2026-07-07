@@ -2158,6 +2158,96 @@ get_model_usage_summary(window_minutes: u64) -> String
 
 Returns the JSON-serialized `ModelUsageSummary` -- a cross-agent, per-model usage table unioning two fidelity tiers. The **transcript-derived** tier (every observed agent, passive, APPROXIMATE) carries per-model token volume, estimated dollar cost, and per-turn responsiveness (latency / tokens-per-sec / inferred provider errors) parsed from transcripts. The **measured** tier (EDAMAME's own configured-provider calls, PRECISE) carries per-model call count, availability (success / total), latency, retries, and true output tokens/sec read from the durable metrics-history `llm_*_by_model` families. Each model row carries whichever tiers had data, tagged by `sources`, so a consumer never confuses a measured availability figure with an approximate transcript-derived one. Dollar figures are estimates (`cost_is_estimate`). Pass `0` for `window_minutes` to use the 24h default; the measured tier reads hourly granularity for windows up to ~14 days and daily beyond that.
 
+#### get_self_augmentation_report
+
+```
+get_self_augmentation_report(window_minutes: u64, agent_type: String, workspace_slug: String) -> String
+```
+
+Self-augmentation analytics: joins *used* skills/commands (transcript-mined, historized in the metrics TSDB) against *available* instruction artifacts (agent-global + per-workspace SBOM inventory) and scores how effectively the operator augments their agents with skills, rules, and commands. Returns the JSON-serialized `SelfAugmentationReport`: a composite score plus six radar sub-scores (coverage, utilization, diversity, leverage, efficiency, trend), aggregate totals, the used/dormant/dead skill table, per-workspace context-tax weight, the per-(agent, workspace, skill) usage tree rows, and the skill reference graph edges. Pass `0` for `window_minutes` to use the 24h default. `agent_type` and `workspace_slug` scope the report (empty = all): window usage, the leverage partition, task economics, the usage tree, and the workspace inventory (context tax, coverage, efficiency) are computed from the filtered session set; per-skill lifetime usage stays fleet-wide (the TSDB by-name family carries no agent/workspace dimension) and the trend axis is scoped per agent only when `agent_type` is set. Demo-gated: demo mode returns the curated fixture regardless of scope.
+
+#### get_skill_overlap_report
+
+```
+get_skill_overlap_report() -> String
+```
+
+Deterministic skill-overlap report: duplicate and near-duplicate instruction artifacts (skills / commands / rules) clustered by content hash, by canonical id shared across owners, and by normalized-slug collision. Fleet-wide and inventory-based (no LLM, no transcript pass). Returns the JSON-serialized overlap report; the same clustering is embedded in `get_self_augmentation_report` as its `overlap` field, so call this directly only when the overlap view is needed without the full augmentation join.
+
+### Agent Fleet Command Centre
+
+Fleet-level rollups backing the Agents tab Overview subtab and the per-agent drill-down card. Pure joins over state the core already computes (run economics, transcript-observer status, detector status, divergence verdicts, the failure-cluster projection, and metrics-history families) -- no new collection, no LLM call (I3), joined in core so consumers never re-derive fleet state client-side (I2).
+
+#### get_agent_fleet_overview
+
+```
+get_agent_fleet_overview(window_minutes: u64) -> String
+```
+
+One-call fleet command-centre rollup: headline counts (agents discovered/paused, sessions observed / in error), estimated spend for the window plus today's historized spend, the deterministic waste/friction signal, the security join (active alertable attack-pattern findings, divergence verdict), 24h hourly cost/error sparklines from the metrics TSDB, and the ranked panels (agents by spend, top costly sessions, top recurring failure clusters). Returns the JSON-serialized `AgentFleetOverview`. Pass `0` for `window_minutes` to use the 24h default. Demo-gated through its inputs. Also exposed as a read-only MCP tool (I1-safe projection).
+
+#### get_agent_overview
+
+```
+get_agent_overview(agent_type: String, window_minutes: u64) -> String
+```
+
+Per-agent detail join: everything the per-agent drill-down card needs in one payload -- inventory/classification, observer state, run economics (session list + efficiency), OS confinement + deterministic blast-radius verdict with reasons, host privilege, detected governance harnesses, failure clusters scoped to the agent, per-instance drift summaries, and the agent's augmentation (skills) slice. Returns the JSON-serialized `AgentOverview`. Pass `0` for `window_minutes` to use the 24h default. Demo-gated through its inputs.
+
+#### get_agent_failure_clusters
+
+```
+get_agent_failure_clusters(window_minutes: u64, agent_type: String) -> String
+```
+
+Failed-intent explorer: deterministic clustering of agent tool errors into recurring failure shapes. Each cluster is keyed by the stable `<tool>|<error_class>` pair (error classes: timeout / permission / not_found / rate_limit / syntax / network / cancelled / other, classified by a fixed keyword pass over the transcript error text -- no LLM, I3). Per cluster: total count, affected agents and session count, first/last seen, trend vs the previous window, and a redacted example snippet only populated when the visibility capture tier allows excerpts (I5). Returns the JSON-serialized `AgentFailureClusterReport`. Re-parses the same transcripts the observer already reads; short-TTL cached. Pass `0` for `window_minutes` to use the 24h default; empty `agent_type` covers all supported agents. Demo-gated. Also exposed as a read-only MCP tool.
+
+### Agent Budgets
+
+Operator-set per-agent daily budgets with staged enforcement (I6: `recommend` -> `confirm`). Budgets are evaluated by the metrics rollup tick against the same TSDB daily buckets the reads report; crossing a cap records a `budget_exceeded` action-history entry (MEDIUM, finding-key deduped per agent x cap x UTC day) plus a runtime notification, and plugs into the existing dismissal model (I4). Operator-only surface: NONE of these are MCP tools (I1).
+
+#### get_agent_budgets
+
+```
+get_agent_budgets() -> String
+```
+
+Return the JSON-serialized `AgentBudgetReport`: the UTC `day` plus one entry per agent carrying the optional `daily_cost_usd_cap` / `daily_token_cap`, the `enforcement_mode` (`recommend` or `confirm`), today's `cost_today_usd` / `tokens_today` actuals, and the derived `cost_breached` / `tokens_breached` flags.
+
+#### set_agent_budget
+
+```
+set_agent_budget(agent_type: String, daily_cost_usd_cap: f64, daily_token_cap: u64) -> String
+```
+
+Set or clear the daily budget for one agent type. A cap value `<= 0` clears that cap; when both end up unset the budget entry is removed entirely. The existing enforcement stage is preserved when only the caps are edited (graduation is managed by `set_agent_budget_enforcement`). Fallible: returns the `{"success": bool, "error": "..."}` envelope (validates the agent type and cap values).
+
+#### set_agent_budget_enforcement
+
+```
+set_agent_budget_enforcement(agent_type: String, mode: String) -> String
+```
+
+Graduate (or revert) one agent's budget between the `recommend` and `confirm` enforcement stages (I6 staged enforcement). Under `confirm` a breach escalates the notification to CRITICAL (never digested) and suggests the pause-observer response action; the breach record itself stays MEDIUM so CI alertable gates are unaffected. Fallible: `{"success": bool, "error": "..."}` envelope (validates the mode and requires an existing budget entry).
+
+### Notification Digest
+
+#### agentic_get_notification_digest_status
+
+```
+agentic_get_notification_digest_status() -> String
+```
+
+Return the notification digest preference snapshot as JSON: `{enabled, pending_count, last_flush_at}`. When the digest is enabled, Info-severity channel notifications (agentic action reports, divergence CLEARED messages) are queued and flushed as one summary message twice daily instead of being sent instantly; Warning/Critical notifications are never digested. Operator-only, never MCP.
+
+#### agentic_set_notification_digest_enabled
+
+```
+agentic_set_notification_digest_enabled(enabled: bool) -> ()
+```
+
+Toggle the notification digest preference. Infallible: turning the digest off flushes anything still queued so no notification is stranded. Operator-only, never MCP.
+
 ---
 
 ## Metrics History
@@ -2458,6 +2548,14 @@ get_structural_run_provenance(run_id: String) -> String
 
 Return the full structural flight record for one run as JSON (pass a `run_id` from `list_structural_runs`): the ordered, replayable event stream projected from the transcript, with NO divergence verdicts or behavioral-model predictions. Returns `{}` when the run is unknown. Read-only MCP-safe (I1).
 
+### explain_structural_run_event
+
+```
+explain_structural_run_event(run_id: String, event_id: String) -> String
+```
+
+Causality-map drill-in for the LLM-free structural recorder: given a `run_id` from `list_structural_runs` and an `event_id` from that run's flight record, walks the run's hash-chained causal edges and returns the JSON-serialized `RunEventExplanation` -- the event itself, its `ancestors` ("prove why" backtrace toward the session root), its `descendants` (downstream impact), the traversed `edges`, plus `backtrace_complete` (the ancestor walk reached the session root) and `chain_valid` (the hash chain verified). Returns `{}` when the run or event is unknown. Read-only projection; MCP-safe (I1).
+
 ### refresh_agent_drift
 
 ```
@@ -2616,7 +2714,7 @@ set_firewall_mode(mode: String) -> String
 get_response_action_catalog() -> String
 ```
 
-(INC-11 response actions) Return the catalog of available response-action kinds as a JSON array: each kind with its target class, whether it is reversible, and whether it requires a prior simulate run. MCP-safe read.
+(INC-11 response actions) Return the catalog of available response-action kinds as a JSON array. Each entry carries `kind`, `description`, `reversible`, `operator_gated`, `simulate_required`, and `wired`. `wired` indicates whether the action's live side-effect primitive is actually implemented in this build (`pause_agent`, `require_confirm_all_calls`, and -- when the `mcp` feature is compiled in -- `revoke_tool_grant`); when `wired` is false, a non-simulated request records an auditable operator-decision intent but applies no live containment, so consumers MUST present it as intent-only rather than executed. MCP-safe read.
 
 ### get_response_action_history
 
@@ -2681,6 +2779,14 @@ set_policy_pack(pack_json: String) -> String
 ```
 
 (INC-13) Replace the active policy pack with a caller-supplied JSON `PolicyPack` (persisted to `VisibilityPreferences`). Returns `{"success": true, "pack_id": ..., "version": ..., "rule_count": N}` on success; `success:false` with an `error` when the JSON is invalid. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not weaken its own governance pack).
+
+### simulate_policy_pack
+
+```
+simulate_policy_pack(pack_json: String) -> String
+```
+
+(INC-13) Policy simulator: dry-run a candidate `PolicyPack` JSON against the live policy-inputs snapshot without persisting the pack or refreshing any state. Returns the `{"success": true, "simulation": {...}}` envelope where the simulation payload carries the inputs snapshot, the evaluations of both the active and the candidate pack, the per-rule delta (`changed_rules`), and the top-level `would_change_compliance` flip flag -- consumed by the app's "preview impact" panel before `set_policy_pack`. `success:false` with an `error` when the candidate JSON is invalid. Operator-only (never MCP).
 
 ### attest_policy_evaluation
 
@@ -2769,6 +2875,14 @@ set_visibility_capture_tier(tier: String) -> String
 ```
 
 Set the visibility data-capture privacy tier. Accepts `metadata_only`, `redacted_excerpt`, or `forensic_full_content`. Returns a `{"success": bool, ...}` envelope; on success echoes the persisted `tier`, on failure carries an `error` describing the accepted values. Persisted to `PrivacyPreferences`.
+
+### get_instruction_content
+
+```
+get_instruction_content(path: String, requested_tier: String) -> String
+```
+
+Read a single on-disk instruction artifact (skill / command / rule) body so the Augmentation drill-down can show what a skill actually contains. The `requested_tier` is clamped to the persisted `visibility_capture_tier` ceiling (I5): `metadata_only` returns an empty body (path + size only), `redacted_excerpt` a bounded head slice with secret-like spans masked, `forensic_full_content` a bounded full body (break-glass; audited). The path is re-validated on the privileged side (confined to recognized instruction artifacts under the user's home dir), so this can never become an arbitrary-file read. Returns the JSON-serialized `InstructionContentResult`; callers read its `found` / `error` fields -- a tier-refused or absent body is a normal displayable outcome, not an exception.
 
 ### get_visibility_roadmap
 

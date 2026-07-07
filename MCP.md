@@ -648,7 +648,7 @@ READ-ONLY. The hash-chained tool-call firewall receipts: per evaluated tool call
 
 ### `get_response_action_catalog`
 
-READ-ONLY. The catalog of available response-action kinds: each kind with its target class, whether it is reversible, and whether it requires a prior simulate run. Requesting an action (`request_response_action`) is operator-only.
+READ-ONLY. The catalog of available response-action kinds: each entry carries `kind`, `description`, `reversible`, `operator_gated`, `simulate_required`, and `wired`. `wired` indicates whether the action's live side-effect primitive is implemented in this build; when false, a non-simulated request records an auditable operator-decision intent only (no live containment). Requesting an action (`request_response_action`) is operator-only.
 
 **Parameters**: None
 
@@ -681,6 +681,21 @@ READ-ONLY. The attestation log: each tamper-evident attestation with its subject
 READ-ONLY. The cross-zone promotion log: each operator request to let an agent operate in a more-trusted firewall origin zone, with `promotion_id`, agent, target zone, reason, status (`requested`/`approved`/`denied`), and decision timestamp. Requesting/deciding a promotion is operator-only -- an observed agent cannot self-promote.
 
 **Parameters**: None
+
+### `get_agent_fleet_overview`
+
+READ-ONLY. Fleet command-centre rollup for all observed agents: headline counts (agents discovered/paused, sessions observed / with tool errors), estimated spend for the window plus today's historized spend, the deterministic waste/friction signal, the security join (active alertable attack-pattern findings, divergence verdict), 24h hourly cost/error sparklines, and ranked panels (agents by spend, top costly sessions, top recurring failure clusters). Pure read-only projection over state the core already computes; no LLM.
+
+**Parameters**:
+- `window_minutes` (integer, optional): Look-back window; `0` uses the 24h default.
+
+### `get_agent_failure_clusters`
+
+READ-ONLY. Deterministic failed-intent clusters: agent tool errors grouped by stable `<tool>|<error_class>` keys (error classes: timeout / permission / not_found / rate_limit / syntax / network / cancelled / other, classified by a fixed keyword pass -- no LLM). Each cluster has count, affected agents and session count, first/last seen, and a capture-tier-gated example snippet.
+
+**Parameters**:
+- `window_minutes` (integer, optional): Look-back window; `0` uses the 24h default.
+- `agent_type` (string, optional): Scope to one agent type; empty covers all supported agents.
 
 > **Observer-independence**: The visibility control-plane mutators (every `refresh_*`, `set_visibility_capture_tier`, `set_firewall_mode`, `approve_agent`, `revoke_agent_approval`, `approve_agent_sbom_baseline`, `request_response_action`, `undo_response_action`, `export_visibility_case`, `set_policy_pack`, `attest_policy_evaluation`, `attest_agent_sbom`, `request_zone_promotion`, `decide_zone_promotion`) and the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`, `get_visibility_roadmap`) are intentionally **not** exposed via MCP. Refresh is implicit (lazy TTL); enforcement, governance, and capture-tier are operator/UI surfaces. Use the EDAMAME app (Agents tab) or `edamame_cli rpc` for those.
 
@@ -878,3 +893,5 @@ Use a per-client credential (from pairing) or shared PSK:
 | 58 | `get_policy_evaluation` | Visibility | Latest policy-pack evaluation (read-only) |
 | 59 | `get_policy_attestations` | Visibility | Tamper-evident attestation log (read-only) |
 | 60 | `get_zone_promotions` | Visibility | Cross-zone promotion log (read-only) |
+| 61 | `get_agent_fleet_overview` | Fleet | Fleet command-centre rollup (read-only) |
+| 62 | `get_agent_failure_clusters` | Fleet | Deterministic failed-intent clusters (read-only) |
