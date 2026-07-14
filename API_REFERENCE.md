@@ -1560,7 +1560,7 @@ Open the browser to the EDAMAME Portal sign-up page.
 
 ### Divergence Detection
 
-Behavioral model management and divergence detection between the reasoning plane (cortex extrapolator) and the execution plane (observed traffic). Requires the `agentic` feature flag.
+Behavioral model management and divergence detection between the reasoning plane (agent intent, produced by EDAMAME's host-side transcript observer for any discovered on-disk agent, or by an in-agent extrapolator for off-host coverage) and the execution plane (observed traffic). Requires the `agentic` feature flag.
 
 #### upsert_behavioral_model
 
@@ -2138,9 +2138,9 @@ Windowing matches the LLM ingest path: the parser keeps the most recently modifi
 
 The returned JSON has shape `{ "payload": CollectedPayload, "diagnostics": CollectDiagnostics }`. `payload.sessions[*].derived_expected_traffic` / `derived_expected_file_access` / `derived_expected_commands` carry the deterministic hints the parser was able to extract from `user_text` / `assistant_text` / tool invocations; the LLM extrapolation step adds the broader `expected_*` / `not_expected_*` slices on top of these hints when a provider is configured.
 
-### Agent Economics & Model Usage
+### Agent Economics
 
-LLM-free economics reads over the same transcripts the observer parses, plus EDAMAME's own configured-provider call telemetry. These back the Agents tab History subtab and the `background-model-usage-summary` / economics posture commands. No LLM call is made to produce them.
+LLM-free economics reads over the same transcripts the observer parses, plus EDAMAME's own configured-provider call telemetry. These back the Agents tab Fleet / Behavior surfaces and the economics posture commands. No LLM call is made to produce them.
 
 #### get_agent_run_economics
 
@@ -2150,33 +2150,17 @@ get_agent_run_economics(active_window_minutes: u64, limit: u32) -> String
 
 Returns the JSON-serialized per-agent run economics over the window: per agent the token volume (input/output/total), an estimated dollar cost, and per-session breakdowns parsed from the agent's own transcripts. Token figures are exact when the transcript carries usage metadata; the dollar conversion comes from the embedded per-model price table (`cost_is_estimate`). Agents whose transcripts carry no usage (e.g. Cursor's `.txt` export) report `has_token_data = false`. Pass `0` for either parameter to use the economics defaults (24h window, 25 sessions per agent). Dispatch mirrors `get_raw_agent_activity`: the macOS app path crosses the sandbox via the helper per agent; standalone / posture CLI calls the foundation parser directly.
 
-#### get_model_usage_summary
-
-```
-get_model_usage_summary(window_minutes: u64) -> String
-```
-
-Returns the JSON-serialized `ModelUsageSummary` -- a cross-agent, per-model usage table unioning two fidelity tiers. The **transcript-derived** tier (every observed agent, passive, APPROXIMATE) carries per-model token volume, estimated dollar cost, and per-turn responsiveness (latency / tokens-per-sec / inferred provider errors) parsed from transcripts. The **measured** tier (EDAMAME's own configured-provider calls, PRECISE) carries per-model call count, availability (success / total), latency, retries, and true output tokens/sec read from the durable metrics-history `llm_*_by_model` families. Each model row carries whichever tiers had data, tagged by `sources`, so a consumer never confuses a measured availability figure with an approximate transcript-derived one. Dollar figures are estimates (`cost_is_estimate`). Pass `0` for `window_minutes` to use the 24h default; the measured tier reads hourly granularity for windows up to ~14 days and daily beyond that.
-
 #### get_self_augmentation_report
 
 ```
 get_self_augmentation_report(window_minutes: u64, agent_type: String, workspace_slug: String) -> String
 ```
 
-Self-augmentation analytics: joins *used* skills/commands (transcript-mined, historized in the metrics TSDB) against *available* instruction artifacts (agent-global + per-workspace SBOM inventory) and scores how effectively the operator augments their agents with skills, rules, and commands. Returns the JSON-serialized `SelfAugmentationReport`: a composite score plus six radar sub-scores (coverage, utilization, diversity, leverage, efficiency, trend), aggregate totals, the used/dormant/dead skill table, per-workspace context-tax weight, the per-(agent, workspace, skill) usage tree rows, and the skill reference graph edges. Pass `0` for `window_minutes` to use the 24h default. `agent_type` and `workspace_slug` scope the report (empty = all): window usage, the leverage partition, task economics, the usage tree, and the workspace inventory (context tax, coverage, efficiency) are computed from the filtered session set; per-skill lifetime usage stays fleet-wide (the TSDB by-name family carries no agent/workspace dimension) and the trend axis is scoped per agent only when `agent_type` is set. Demo-gated: demo mode returns the curated fixture regardless of scope.
-
-#### get_skill_overlap_report
-
-```
-get_skill_overlap_report() -> String
-```
-
-Deterministic skill-overlap report: duplicate and near-duplicate instruction artifacts (skills / commands / rules) clustered by content hash, by canonical id shared across owners, and by normalized-slug collision. Fleet-wide and inventory-based (no LLM, no transcript pass). Returns the JSON-serialized overlap report; the same clustering is embedded in `get_self_augmentation_report` as its `overlap` field, so call this directly only when the overlap view is needed without the full augmentation join.
+Self-augmentation analytics: joins *used* skills/commands (transcript-mined, historized in the metrics TSDB) against *available* instruction artifacts (agent-global + per-workspace component inventory) and scores how effectively the operator augments their agents with skills, rules, and commands. Returns the JSON-serialized `SelfAugmentationReport`: a composite score plus six radar sub-scores (coverage, utilization, diversity, leverage, efficiency, trend), aggregate totals, the used/dormant/dead skill table, per-workspace context-tax weight, the per-(agent, workspace, skill) usage tree rows, and the skill reference graph edges. Pass `0` for `window_minutes` to use the 24h default. `agent_type` and `workspace_slug` scope the report (empty = all): window usage, the leverage partition, task economics, the usage tree, and the workspace inventory (context tax, coverage, efficiency) are computed from the filtered session set; per-skill lifetime usage stays fleet-wide (the TSDB by-name family carries no agent/workspace dimension) and the trend axis is scoped per agent only when `agent_type` is set. Demo-gated: demo mode returns the curated fixture regardless of scope.
 
 ### Agent Fleet Command Centre
 
-Fleet-level rollups backing the Agents tab Overview subtab and the per-agent drill-down card. Pure joins over state the core already computes (run economics, transcript-observer status, detector status, divergence verdicts, the failure-cluster projection, and metrics-history families) -- no new collection, no LLM call (I3), joined in core so consumers never re-derive fleet state client-side (I2).
+Fleet-level rollups backing the Agents tab Fleet subtab (fleet health band) and the per-agent drill-down card. Pure joins over state the core already computes (run economics, transcript-observer status, detector status, divergence verdicts, the failure-cluster projection, and metrics-history families) -- no new collection, no LLM call (I3), joined in core so consumers never re-derive fleet state client-side (I2).
 
 #### get_agent_fleet_overview
 
@@ -2184,7 +2168,7 @@ Fleet-level rollups backing the Agents tab Overview subtab and the per-agent dri
 get_agent_fleet_overview(window_minutes: u64) -> String
 ```
 
-One-call fleet command-centre rollup: headline counts (agents discovered/paused, sessions observed / in error), estimated spend for the window plus today's historized spend, the deterministic waste/friction signal, the security join (active alertable attack-pattern findings, divergence verdict), 24h hourly cost/error sparklines from the metrics TSDB, and the ranked panels (agents by spend, top costly sessions, top recurring failure clusters). Returns the JSON-serialized `AgentFleetOverview`. Pass `0` for `window_minutes` to use the 24h default. Demo-gated through its inputs. Also exposed as a read-only MCP tool (I1-safe projection).
+One-call fleet command-centre rollup: headline counts (agents discovered/paused, sessions observed / in error), estimated spend for the window plus today's historized spend, the deterministic waste/friction signal, the security join (active alertable attack-pattern findings, divergence verdict), 24h hourly cost/error sparklines from the metrics TSDB, and the ranked panels (agents by spend, top recurring failure clusters). Returns the JSON-serialized `AgentFleetOverview`. Pass `0` for `window_minutes` to use the 24h default. Demo-gated through its inputs. Also exposed as a read-only MCP tool (I1-safe projection).
 
 #### get_agent_overview
 
@@ -2252,7 +2236,7 @@ Toggle the notification digest preference. Infallible: turning the digest off fl
 
 ## Metrics History
 
-Read-only projection of the durable metrics-history time-series database (TSDB). The core's `metrics_rollup_task` folds per-agent and per-session telemetry into bounded `hourly` and `daily` buckets (token/cost by model and agent, LLM and MCP calls, network bytes in/out by domain, file events by type, ...), persisted to user-space storage with a retention policy. This is the LLM-free backend for the Agents tab History subtab Trends charts and the measured tier of `get_model_usage_summary`. Requires the `agentic` feature flag.
+Read-only projection of the durable metrics-history time-series database (TSDB). The core's `metrics_rollup_task` folds per-agent and per-session telemetry into bounded `hourly` and `daily` buckets (token/cost by agent, LLM calls by model, MCP calls by server, network bytes in/out by domain, file events by type, ...), persisted to user-space storage with a retention policy. This is the LLM-free backend for the Agents tab Behavior subtab Trends charts. Requires the `agentic` feature flag.
 
 **Source**: `api/api_metrics.rs`. See `AGENTIC.md` ("Metrics history") in the core repo for the rollup families and retention model.
 
@@ -2262,7 +2246,15 @@ Read-only projection of the durable metrics-history time-series database (TSDB).
 get_metrics_history(family: String, granularity: String, range_minutes: u64) -> String
 ```
 
-Return the matching metric buckets as a JSON-serialized `MetricsHistoryAPI`: the echoed query (`family`, `granularity`, `range_minutes`, `generated_at`) plus `buckets` (ascending by `start`). Each bucket carries its aligned `start` instant and a `series` array of `{ family, dimension, sum, count, min, max, avg }` entries (`min`/`max` populated only for gauge families; counters leave them `null`). `family = ""` (or `"all"`) returns every family; otherwise pass a canonical family name (e.g. `tokens_input_by_model`, `est_cost_usd_by_agent`, `llm_calls_total_by_model`, `mcp_calls_by_server`, `net_bytes_in_by_domain`, `net_bytes_out_by_domain`, `files_by_event_type`). `granularity` accepts `hourly` / `daily` (aliases `hour`/`h`, `day`/`d`); an unrecognized granularity returns an `{"error": ...}` object rather than throwing, so callers always get parseable output. `range_minutes` bounds the look-back window from now.
+Return the matching metric buckets as a JSON-serialized `MetricsHistoryAPI`: the echoed query (`family`, `granularity`, `range_minutes`, `generated_at`) plus `buckets` (ascending by `start`). Each bucket carries its aligned `start` instant and a `series` array of `{ family, dimension, sum, count, min, max, avg }` entries (`min`/`max` populated only for gauge families; counters leave them `null`). `family = ""` (or `"all"`) returns every family; otherwise pass a canonical family name (e.g. `tokens_total_by_agent`, `est_cost_usd_by_agent`, `llm_calls_total_by_model`, `mcp_calls_by_server`, `net_bytes_in_by_domain`, `net_bytes_out_by_domain`, `files_by_event_type`). `granularity` accepts `hourly` / `daily` (aliases `hour`/`h`, `day`/`d`); an unrecognized granularity returns an `{"error": ...}` object rather than throwing, so callers always get parseable output. `range_minutes` bounds the look-back window from now.
+
+### clear_metrics_history
+
+```
+clear_metrics_history() -> ()
+```
+
+Clear the durable metrics-history TSDB (the Agents tab "clear history" control). Infallible mutator: a persist failure is logged core-side rather than surfaced. Triggers `AgentMetricsUpdated` so the Flutter tabs refresh at once. Operator-only, never MCP.
 
 ---
 
@@ -2374,9 +2366,9 @@ Read the persisted crash-reports preference. Mirror of the `crash_reports_enable
 
 ## Agent Visibility
 
-Agent-visibility surface spanning the staged roadmap (Stage A discovery through Stage D+ governance): MCP server discovery + risk analysis, agent SBOM + drift, capability graph + trust-zone reachability, recursion/delegation detection, the hash-chained run flight recorder, goal/delegation drift timelines, sensitive data-flow / memory / agent-to-agent maps, the composite alignment rollup, the tool-call firewall, ADR response actions + case export, and enterprise policy packs / attestations / cross-zone approval. Requires the `agentic` feature flag. Rich, deeply-nested domain data is returned as a JSON `String` (same convention as agentic findings/history); only the capture tier, the compact summary, and the roadmap get a typed FRB mirror. Read RPCs lazily ensure a fresh snapshot (TTL-bounded `ensure_*`/`get_*`) so a single-shot caller gets data without a separate refresh call.
+Agent-visibility surface spanning the staged roadmap (Stage A discovery through Stage D+ governance): MCP server discovery + risk analysis, agent component inventory, capability graph + trust-zone reachability, recursion/delegation detection, the hash-chained run flight recorder, goal/delegation drift timelines, sensitive data-flow / memory / agent-to-agent maps, the tool-call firewall, ADR response actions + case export, and enterprise policy packs / attestations / cross-zone approval. Requires the `agentic` feature flag. Rich, deeply-nested domain data is returned as a JSON `String` (same convention as agentic findings/history); only the capture tier, the compact summary, and the roadmap get a typed FRB mirror. Read RPCs lazily ensure a fresh snapshot (TTL-bounded `ensure_*`/`get_*`) so a single-shot caller gets data without a separate refresh call.
 
-Observer-independence (I1): the read RPCs are also exposed as read-only MCP tools (see [MCP.md](MCP.md#agent-visibility-tools)), but every **mutator** here (`refresh_*`, `set_firewall_mode`, `approve_agent`/`revoke_agent_approval`/`approve_agent_sbom_baseline`, `request_response_action`/`undo_response_action`, `set_policy_pack`, `attest_policy_evaluation`/`attest_agent_sbom`, `request_zone_promotion`/`decide_zone_promotion`, `set_visibility_capture_tier`) is operator/UI control-plane only and is never an MCP tool -- an observed agent must not be able to weaken, silence, or self-approve the controls that watch it. Staged enforcement (I6): the tool-call firewall defaults to `recommend` (never gates); `confirm`/`block` are opt-in operator modes. See `VISIBILITYIMPROVEMENTS.md`.
+Observer-independence (I1): the read RPCs are also exposed as read-only MCP tools (see [MCP.md](MCP.md#agent-visibility-tools)), but every **mutator** here (`refresh_*`, `set_firewall_mode`, `approve_agent`/`revoke_agent_approval`, `request_response_action`/`undo_response_action`, `set_policy_pack`, `attest_policy_evaluation`, `request_zone_promotion`/`decide_zone_promotion`, `set_visibility_capture_tier`) is operator/UI control-plane only and is never an MCP tool -- an observed agent must not be able to weaken, silence, or self-approve the controls that watch it. Staged enforcement (I6): the tool-call firewall defaults to `recommend` (never gates); `confirm`/`block` are opt-in operator modes. See `VISIBILITYIMPROVEMENTS.md`.
 
 **Source**: `api/api_visibility.rs`
 
@@ -2386,7 +2378,7 @@ Observer-independence (I1): the read RPCs are also exposed as read-only MCP tool
 refresh_agent_visibility() -> String
 ```
 
-Force a structural visibility recollection (MCP discovery + SBOM + capability graph). Returns a `{"success": bool, ...}` envelope; on success carries `endpoint_count`, `finding_count`, `sbom_count`, and `graph_edge_count`. Most callers can rely on the lazy `ensure_*` refresh in the read RPCs instead of calling this explicitly.
+Force a structural visibility recollection (MCP discovery + component inventory + capability graph). Returns a `{"success": bool, ...}` envelope; on success carries `endpoint_count`, `finding_count`, `component_inventory_count`, and `graph_edge_count`. Most callers can rely on the lazy `ensure_*` refresh in the read RPCs instead of calling this explicitly.
 
 ### refresh_recursion_risk
 
@@ -2402,7 +2394,7 @@ Force a recursion/delegation-tree recorrelation. Returns a `{"success": bool, ..
 get_visibility_summary() -> VisibilitySummaryAPI
 ```
 
-Return a compact typed summary across all visibility domains: snapshot timestamp/presence, MCP endpoint/finding counts (with HIGH/CRITICAL breakdown), SBOM and component counts, capability-graph edge count, recursion tree/loop counts and max delegation depth, and the total alertable finding count. Used by the top-level Agents tab header and badges. Lazily ensures both the structural and recursion snapshots are fresh.
+Return a compact typed summary across all visibility domains: snapshot timestamp/presence, MCP endpoint/finding counts (with HIGH/CRITICAL breakdown), component-inventory and component counts, capability-graph edge count, recursion tree/loop counts and max delegation depth, and the total alertable finding count. Used by the top-level Agents tab header and badges. Lazily ensures both the structural and recursion snapshots are fresh.
 
 ### get_mcp_inventory
 
@@ -2428,37 +2420,13 @@ get_mcp_findings() -> String
 
 Return just the MCP risk findings as a JSON array (`Vec<VisibilityFinding>`) -- severity-graded issues such as unauthenticated or network-exposed endpoints and over-privileged tool surfaces. Lazily ensures a fresh structural snapshot.
 
-### get_agent_sboms
+### get_agent_component_inventories
 
 ```
-get_agent_sboms() -> String
+get_agent_component_inventories() -> String
 ```
 
-Return the per-agent software bill-of-materials as a JSON array (`Vec<AgentSbom>`): the agent runtime plus its installed plugins/skills/MCP components and their dependencies. Lazily ensures a fresh structural snapshot.
-
-### get_agent_sbom_cyclonedx
-
-```
-get_agent_sbom_cyclonedx(agent_type: String) -> String
-```
-
-Return the SBOM for a single agent type exported in CycloneDX JSON format (for ingestion by external SCA/SBOM tooling). Returns `{}` when no SBOM exists for that agent type. Lazily ensures a fresh structural snapshot.
-
-### get_agent_sbom_diff
-
-```
-get_agent_sbom_diff(agent_type: String) -> String
-```
-
-Return the diff between the current SBOM and the stored baseline for an agent type as JSON (`SbomDiff`): added, removed, and version-changed components since the baseline was captured. Lazily ensures a fresh structural snapshot.
-
-### approve_agent_sbom_baseline
-
-```
-approve_agent_sbom_baseline(agent_type: String) -> String
-```
-
-(INC-10) Operator: promote an agent's current SBOM to be the new drift baseline, resetting `get_agent_sbom_diff` to empty. Returns `{"success": bool, ...}`; `success:false` with an `error` when no current SBOM exists for that agent type. Operator-only mutator -- NOT an MCP tool (observer-independence I1: an observed agent must not be able to silence drift against its own baseline).
+Return the per-agent component inventory as a JSON array (`Vec<AgentComponentInventory>`): the agent runtime plus its installed plugins/skills/MCP components. Feeds the constellation view and the self-augmentation instruction-component discovery. Lazily ensures a fresh structural snapshot.
 
 ### get_capability_graph
 
@@ -2490,7 +2458,7 @@ get_effective_capabilities() -> String
 get_host_blast_radius() -> String
 ```
 
-(C3 / INC-10) Return the host blast-radius bundle as a JSON envelope -- `host_privilege` (the shared host-privilege assessment: admin membership / passwordless-root / elevated session), `agent_sandboxes` (per-agent OS-confinement assessment), `harnesses` (one entry per known AI-SDLC governance harness -- AgentField, Rippletide, ... -- each with a `detected` flag plus the on-disk evidence that matched), and `blast_radius_agents` (the canonical per-agent blast-radius verdicts, the same deterministic rule the score threat uses, scoped to the present sandboxes). Answers "if any agent here is compromised, what can it reach on this machine without further authentication, is it OS-confined, and is it wrapped by a governance harness?". Informational, never alertable.
+(C3 / INC-10) Return the host blast-radius bundle as a JSON envelope -- `host_privilege` (the shared host-privilege assessment: admin membership / passwordless-root / elevated session), `agent_sandboxes` (per-agent OS-confinement assessment), `harnesses` (one entry per known AI agent governance harness -- AgentField, Rippletide, ... -- each with a `detected` flag plus the on-disk evidence that matched), and `blast_radius_agents` (the canonical per-agent blast-radius verdicts, the same deterministic rule the score threat uses, scoped to the present sandboxes). Answers "if any agent here is compromised, what can it reach on this machine without further authentication, is it OS-confined, and is it wrapped by a governance harness?". Informational, never alertable.
 
 ### get_recursion_risk
 
@@ -2644,29 +2612,13 @@ get_a2a_graph() -> String
 
 (INC-9) Return the agent-to-agent surface map as JSON: discovered inter-agent communication peers and the `cross_zone_edges` where one agent can reach another across a trust boundary, severity-graded.
 
-### refresh_alignment_rollup
-
-```
-refresh_alignment_rollup() -> String
-```
-
-(INC-12 alignment rollup) Force a recompute of the single composite alignment score across every visibility domain plus the attack-pattern alertable count. Returns `{"success": true, "score": N, "band": "...", "hard_fail": bool}`. Reads refresh lazily.
-
-### get_alignment_rollup
-
-```
-get_alignment_rollup() -> String
-```
-
-(INC-12) Return the composite alignment rollup as JSON: the 0-100 `score`, the `band` (`aligned`/`drifting`/`misaligned`/`critical`), `hard_fail` (a catastrophic domain forces failure regardless of score), and the per-domain contribution breakdown. This is the single headline number for "how aligned are the agents on this host".
-
 ### get_owasp_scorecard
 
 ```
 get_owasp_scorecard() -> String
 ```
 
-Return the OWASP GenAI crosswalk scorecard as JSON: static per-category coverage grades (from `OWASPGENAI.md`) plus live finding attribution parsed from the `OWASP-<id>` reference tokens already carried by visibility and attack-pattern findings, with the headline reused from the alignment rollup. Read-only, derived; no separate refresh. MCP-safe read.
+Return the OWASP GenAI crosswalk scorecard as JSON: static per-category coverage grades (from `OWASPGENAI.md`) plus live finding attribution parsed from the `OWASP-<id>` reference tokens already carried by visibility and attack-pattern findings, with the `headline_status` (`clean`/`attention`/`critical`) derived directly from the attributed alertable findings. Read-only, derived; no separate refresh. MCP-safe read.
 
 ### get_agent_subprocess_usage
 
@@ -2707,6 +2659,38 @@ set_firewall_mode(mode: String) -> String
 ```
 
 (INC-10) Set the firewall enforcement mode. Accepts `recommend` (default, never gates -- I6), `confirm` (gates non-catastrophic verdicts pending operator confirmation), or `block` (gates catastrophic verdicts outright). Returns `{"success": bool, ...}`; `success:false` with an `error` for an unknown mode. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not relax its own firewall).
+
+### get_agent_enforcement_capabilities
+
+```
+get_agent_enforcement_capabilities() -> String
+```
+
+(A3 truth-in-UX) Return the per-agent pre-execution enforcement capability catalog as a JSON array. For each supported agent: the achievable enforcement `tier`, gate-able vs observe-only tool classes, the native hook mechanism, whether our plugin currently wires it (`plugin_hook_wired`), and the validation confidence. Read-only, deterministic (I3). Consumers MUST surface `plugin_hook_wired` / `validation` alongside `tier` so a not-yet-wired ceiling never reads as active enforcement. MCP-safe read.
+
+### evaluate_pre_execution_tool_call
+
+```
+evaluate_pre_execution_tool_call(request_json: String) -> String
+```
+
+(A3 Stage C live gating) The agent hook's single intake tool for the pre-execution tool-call firewall. A fresh request submits a metadata-only proposed tool call (I5: `agent_type`, `tool_name`, `tool_class`, taint, sink zone -- never raw args); it is scored, clamped by the agent's enforcement ceiling, and returns `{decision: allow|hold|block, pending_id?, verdict, score, severity, rationale, mode, gated, hold_ttl_secs}` -- when it gates, a `PendingToolCall` is recorded. With a non-empty `pending_id` it instead polls a previously-held call, returning `{decision, pending_id, status}`. Unknown/pruned ids and parse errors fail closed to `block`. MCP-safe intake (reasoning-plane; it can never approve a held call -- that is `resolve_pending_tool_call`, RPC-only).
+
+### get_pending_tool_calls
+
+```
+get_pending_tool_calls() -> String
+```
+
+(A3) Return the pending-approvals queue (held + recently resolved pre-execution tool calls) as a JSON array, TTL-swept. Metadata only (I5). Operator read surface for the confirmation UI.
+
+### resolve_pending_tool_call
+
+```
+resolve_pending_tool_call(pending_id: String, approve: bool) -> String
+```
+
+(A3) Approve or deny a held pre-execution tool call. Returns `{"success": bool, ...}`; `success:false` with an `error` when the id is unknown or the entry was already resolved/expired. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must NEVER approve its own held call; that would defeat the entire synchronous gate).
 
 ### get_response_action_catalog
 
@@ -2796,21 +2780,13 @@ attest_policy_evaluation() -> String
 
 (INC-13) Produce a content-addressed, tamper-evident attestation (SHA-256 `content_digest`) over the current policy evaluation and append it to the attestation log. Returns `{"success": true, "attestation": {...}}`. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not fabricate its own compliance attestation).
 
-### attest_agent_sbom
-
-```
-attest_agent_sbom(agent_type: String) -> String
-```
-
-(INC-13) Produce a content-addressed, tamper-evident attestation over one agent's current SBOM and append it to the attestation log. Returns `{"success": true, "attestation": {...}}`; `success:false` with an `error` when no SBOM exists for that agent. Operator-only mutator -- NOT an MCP tool (I1).
-
 ### get_policy_attestations
 
 ```
 get_policy_attestations() -> String
 ```
 
-(INC-13) Return the attestation log as a JSON array: each attestation with its subject (policy evaluation or agent SBOM), the SHA-256 `content_digest`, and the timestamp. Use `content_digest` to verify tamper-evidence against the attested object. MCP-safe read.
+(INC-13) Return the attestation log as a JSON array: each attestation with its subject (policy evaluation), the SHA-256 `content_digest`, and the timestamp. Use `content_digest` to verify tamper-evidence against the attested object. MCP-safe read.
 
 ### get_zone_promotions
 
