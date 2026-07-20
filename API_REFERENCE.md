@@ -1777,6 +1777,38 @@ undismiss_vulnerability_finding(finding_key: String) -> String
 
 Restore a previously dismissed vulnerability or safety-floor finding by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
 
+#### dismiss_augmentation_todo
+
+```
+dismiss_augmentation_todo(scope_key: String, todo_key: String) -> String
+```
+
+Dismiss one Enlightenment Path Next Steps todo in a scope (operator-only; never MCP). Path derives todos client-side from `get_self_augmentation_report`; core only stores opaque dismiss/read state. Key contract: `scope_key` is the workspace slug or `__aggregate__`; `todo_key` is `${Dart _StepKind.name}|${subject}` (camelCase, e.g. `ghostReuse|deploy.sh`). Returns JSON with `{ "success": true, "changed": bool }`.
+
+#### undismiss_augmentation_todo
+
+```
+undismiss_augmentation_todo(scope_key: String, todo_key: String) -> String
+```
+
+Restore a previously dismissed augmentation todo. Same key contract as `dismiss_augmentation_todo`. Returns JSON with `{ "success": true, "changed": bool }`.
+
+#### set_augmentation_todo_read
+
+```
+set_augmentation_todo_read(scope_key: String, todo_key: String, read: bool) -> String
+```
+
+Mark an augmentation todo read or unread. Same key contract as `dismiss_augmentation_todo`. Returns JSON with `{ "success": true, "changed": bool }`.
+
+#### get_augmentation_todo_states
+
+```
+get_augmentation_todo_states(scope_key: String) -> String
+```
+
+Return the durable dismiss/read map for one scope as a bare JSON object `{ todo_key: { dismissed, read, dismissed_at, read_at } }`. Empty object means every derived todo is active and unread. Same `scope_key` contract as the mutators.
+
 #### clear_vulnerability_history
 
 ```
@@ -2157,6 +2189,46 @@ get_self_augmentation_report(window_minutes: u64, agent_type: String, workspace_
 ```
 
 Self-augmentation analytics: joins *used* skills/commands (transcript-mined, historized in the metrics TSDB) against *available* instruction artifacts (agent-global + per-workspace component inventory) and scores how effectively the operator augments their agents with skills, rules, and commands. Returns the JSON-serialized `SelfAugmentationReport`: a composite score plus six radar sub-scores (coverage, utilization, diversity, leverage, efficiency, trend), aggregate totals, the used/dormant/dead skill table, per-workspace context-tax weight, the per-(agent, workspace, skill) usage tree rows, and the skill reference graph edges. Pass `0` for `window_minutes` to use the 24h default. `agent_type` and `workspace_slug` scope the report (empty = all): window usage, the leverage partition, task economics, the usage tree, and the workspace inventory (context tax, coverage, efficiency) are computed from the filtered session set; per-skill lifetime usage stays fleet-wide (the TSDB by-name family carries no agent/workspace dimension) and the trend axis is scoped per agent only when `agent_type` is set. Demo-gated: demo mode returns the curated fixture regardless of scope.
+
+### Enlightenment Coach
+
+On-demand, guardrailed LLM coaching over the deterministic augmentation aggregate (the same scoped report `get_self_augmentation_report` returns). The LLM only ever sees the aggregate JSON, never raw transcripts, and every answer must pass a strict envelope validator (schema, caps, evidence-ref allowlist) or generation fails. Insights are content-addressed by aggregate hash, so identical aggregates never re-call the LLM. User-initiated from the Path UI only — never a background tick. Not exposed via MCP (operator-only).
+
+#### generate_augmentation_coach_insight
+
+```
+generate_augmentation_coach_insight(kind: String, window_minutes: u64, agent_type: String, workspace_slug: String) -> String
+```
+
+Generate (or return a cached) one coach insight for a template `kind` over the scoped aggregate. `window_minutes` / `agent_type` / `workspace_slug` scope the aggregate exactly like `get_self_augmentation_report` (empty strings = all, `0` = 24h default). Fallible envelope: `{"success": true, "cache_hit": bool, "insight": {...CoachInsightRecord...}}` on success (the UI renders `insight.envelope` and badges `insight.transport`), `{"success": false, "error": "..."}` on failure (unknown `kind`, no LLM transport configured, LLM call failed, or the produced envelope was rejected by the validator).
+
+#### get_augmentation_coach_insights
+
+```
+get_augmentation_coach_insights() -> String
+```
+
+Return all cached coach insights as a JSON array of `CoachInsightRecord`. Read-only; the UI matches records to its current scope via `scope_key` and decides staleness by comparing each record's `aggregate_hash` against a freshly computed aggregate.
+
+#### get_coach_transport_status
+
+```
+get_coach_transport_status() -> String
+```
+
+Return coach transport availability as JSON `CoachTransportStatus`: which LLM provider is configured, whether it is usable right now, and the transport label generation would use — so the UI can badge what "Coach me" will do before the user taps it. Read-only.
+
+### In-Agent Fix Runs
+
+Operator-initiated "run it for me" fixes: send a rendered fix prompt (the CloudModel template, never LLM output) to a detected agent CLI with a report-listed workspace as cwd, launched in a real interactive terminal. Always behind an explicit UI confirmation dialog. Guardrails: the agent must have a detected CLI on this host, and the workspace must already be present in the augmentation report. Not an MCP tool (operator-only, I1). Dispatch is three-arm: standalone calls the foundation directly; the desktop app path crosses the sandbox via the helper (which, running as SYSTEM/root, crosses back into the operator's desktop session to open the terminal); unsupported platforms error.
+
+#### run_fix_prompt_in_workspace_interactive
+
+```
+run_fix_prompt_in_workspace_interactive(agent_type: String, workspace_path: String, prompt: String) -> String
+```
+
+Human-in-the-loop fix run: opens a real terminal window in the operator's desktop session, seeds the fix prompt, and launches the agent's normal interactive TUI so its own approval UI gates each tool call — the operator reads and confirms every step. No auto-approve / print-mode flag (`-p`, `--force`, `--trust`, `exec`) is passed. Session persistence is ON, so the resulting session is recorded and re-graded by the transcript observer like any other. On desktop the privileged helper (SYSTEM on Windows, root on macOS) crosses into the operator's active session to open the terminal (`WTSQueryUserToken` + `CreateProcessAsUserW` on Windows, `launchctl asuser` on macOS); in standalone mode (posture; Linux has no helper) the daemon launches directly, dropping to the operator (`sudo -u` + `DISPLAY`/`XAUTHORITY` discovery on Linux). Fallible envelope: `{"success": true, "spawn": {...CoachFixSpawn: agent_type, binary, workspace_path, pid, command...}}` on success, `{"success": false, "error": "..."}` on failure (no CLI detected, workspace not in the report, terminal launch failed). Interactive runs are not log-captured — the operator watches the live terminal.
 
 ### Agent Fleet Command Centre
 
@@ -2620,13 +2692,21 @@ get_owasp_scorecard() -> String
 
 Return the OWASP GenAI crosswalk scorecard as JSON: static per-category coverage grades (from `OWASPGENAI.md`) plus live finding attribution parsed from the `OWASP-<id>` reference tokens already carried by visibility and attack-pattern findings, with the `headline_status` (`clean`/`attention`/`critical`) derived directly from the attributed alertable findings. Read-only, derived; no separate refresh. MCP-safe read.
 
+### get_trust_controls_scorecard
+
+```
+get_trust_controls_scorecard() -> String
+```
+
+Return the Trust Controls (trustcontrols.ai) scorecard as JSON: static per-control coverage grades and enforcement flags (from the trustcontrols.ai catalog, encoded in `edamame_foundation::agent_trust_controls`) plus live finding attribution that reuses the same `OWASP-<id>` reference pipeline, with the `headline_status` derived directly from the attributed alertable/critical findings. The trustcontrols.ai counterpart to `get_owasp_scorecard`. Read-only, derived; no separate refresh. MCP-safe read.
+
 ### get_agent_subprocess_usage
 
 ```
-get_agent_subprocess_usage() -> String
+get_agent_subprocess_usage(window_minutes: u64) -> String
 ```
 
-Return agent critical-subprocess usage as JSON -- read-only, derived, LLM-free. Reveals which discovered agents are/have been spawning `ssh`/`scp`/`nc`/shells/`docker`/... by classifying the L7 process lineage on captured sessions and attributing it to a known agent identity. Findings are capped at MEDIUM (reveal, not alert) and demo-guarded in the CoreManager method. MCP-safe read.
+Return agent critical-subprocess usage as JSON -- read-only, derived, LLM-free. Reveals which discovered agents are/have been spawning `ssh`/`scp`/`nc`/shells/`docker`/... by classifying the L7 process lineage on captured sessions and attributing it to a known agent identity. Findings are capped at MEDIUM (reveal, not alert) and demo-guarded in the CoreManager method. `window_minutes` selects the timeline projection: `0` = live capture horizon (used by blast radius + the MCP read tool); `>0` = project the retained 30-day history over that many minutes (the UI's 24h / 7d / 30d selector). MCP-safe read.
 
 ### get_firewall_status
 
