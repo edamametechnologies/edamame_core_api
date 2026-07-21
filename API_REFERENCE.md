@@ -2940,13 +2940,13 @@ get_instruction_content(path: String, requested_tier: String) -> String
 
 Read a single on-disk instruction artifact (skill / command / rule) body so the Augmentation drill-down can show what a skill actually contains. The `requested_tier` is clamped to the persisted `visibility_capture_tier` ceiling (I5): `metadata_only` returns an empty body (path + size only), `redacted_excerpt` a bounded head slice with secret-like spans masked, `forensic_full_content` a bounded full body (break-glass; audited). The path is re-validated on the privileged side (confined to recognized instruction artifacts under the user's home dir), so this can never become an arbitrary-file read. Returns the JSON-serialized `InstructionContentResult`; callers read its `found` / `error` fields -- a tier-refused or absent body is a normal displayable outcome, not an exception.
 
-### get_visibility_roadmap
+### reveal_path_in_file_manager
 
 ```
-get_visibility_roadmap() -> VisibilityRoadmapAPI
+reveal_path_in_file_manager(path: String) -> String
 ```
 
-Return the visibility feature roadmap: every increment (MVP/v1/v2) with its id, title, tier, status (`available` or `planned`), and the RPC names it exposes (live or reserved). Lets the UI render planned-feature placeholders without registering speculative always-failing stub RPCs. See `VISIBILITYIMPROVEMENTS.md`.
+Reveal a transcript or instruction path in the OS file manager (Finder / Explorer / xdg-open). On macOS the sandboxed app cannot open paths under the real home via `Uri.file`; this RPC runs on the privileged helper (or in-process under `standalone`), resolves dash-encoded workspace slugs such as `-Users-me-code-repo` to `~/.claude/projects/<slug>` when present, confines the target under the user's home, and opens it. Returns JSON `{"success": bool, "opened_path": "...", "error": "..."}`.
 
 ---
 
