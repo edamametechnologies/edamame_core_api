@@ -7,6 +7,14 @@ Complete reference for all MCP (Model Context Protocol) tools exposed by EDAMAME
 **Default endpoint**: `http://127.0.0.1:3000/mcp`
 **Authentication**: Dual-mode (per-client credentials or shared PSK) via `Authorization: Bearer <token>` header
 
+**Retired 1.7.0:** Tool-call firewall MCP tools (`get_firewall_status`,
+`get_firewall_evaluations`), ADR response-action reads (`get_response_action_*`),
+policy/attest/zone reads (`get_policy_*`, `get_zone_promotions`), and Level-2
+plugin provisioning were removed from the product. Host-side observation is
+default; prevention is via **nono** / **srt** harnesses (read via
+visibility/blast-radius tools). First-seen acknowledgment is operator-only RPC
+(`acknowledge_agent` / `unacknowledge_agent`), never MCP.
+
 ---
 
 ## Observer-Independence Policy (Important)
@@ -25,10 +33,10 @@ The MCP tool surface therefore enforces a strict read-only contract for security
 | Read divergence verdicts / history / engine status | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read vulnerability findings / history / detector status | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read active dismissal rules + audit log | YES (read-only) | EDAMAME app, edamame_cli RPC |
-| Read agent visibility (MCP inventory, component inventory, capability graph + reachability, recursion, flight recorder, drift timelines, data-flow / memory / A2A maps, firewall status/receipts, response catalog/history, policy pack/evaluation/attestations, zone promotions, agent inventory) | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Read agent visibility (MCP inventory, component inventory, capability graph + reachability, recursion, flight recorder, drift timelines, data-flow / memory / A2A maps, response catalog/history, policy pack/evaluation/attestations, zone promotions, agent inventory, blast radius / harnesses) | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Refresh any visibility domain / set capture tier | **NO** | EDAMAME app (Agents tab), edamame_cli RPC |
 | Approve / revoke an agent | **NO** | EDAMAME app (Agents tab), edamame_cli RPC |
-| Set tool-call firewall mode (recommend/confirm/block) | **NO** | EDAMAME app, edamame_cli RPC |
+| Tool-call firewall (retired 1.7.0) | **NO** | N/A |
 | Request / undo a response action, export a case bundle | **NO** | EDAMAME app, edamame_cli RPC |
 | Set policy pack / attest evaluation | **NO** | EDAMAME app, edamame_cli RPC |
 | Request / decide a cross-zone promotion | **NO** | EDAMAME app, edamame_cli RPC |
@@ -490,9 +498,9 @@ Useful for incident review and explaining "why didn't I see this finding?".
 
 ## Agent Visibility Tools
 
-Read-only structural visibility into the agents running on this host, spanning the full staged roadmap (Stage A discovery through Stage D+ governance): the MCP attack surface, per-agent software bill-of-materials, the capability graph and trust-zone reachability, recursion/delegation risk, the hash-chained run flight recorder, goal/delegation drift timelines, sensitive data-flow / memory / agent-to-agent maps, the tool-call firewall status and receipts, the ADR response-action catalog and history, and the enterprise policy pack / evaluation / attestations / cross-zone promotion log. Each tool lazily ensures a fresh snapshot before returning. All output is **metadata-only** -- it never includes secret values, credential bodies, or transcript content (only structural markers and goal hashes are derived). Requires the `agentic` feature flag.
+Read-only structural visibility into the agents running on this host (Stage A discovery + Stage B explainability): the MCP attack surface, per-agent software bill-of-materials, the capability graph and trust-zone reachability, recursion/delegation risk, the hash-chained run flight recorder, goal/delegation drift timelines, and sensitive data-flow / memory / agent-to-agent maps. **Retired 1.7.0 from MCP and RPC:** tool-call firewall, ADR response-action catalog/history, and policy pack / evaluation / attestation / zone-promotion tools. Each tool lazily ensures a fresh snapshot before returning. All output is **metadata-only** -- it never includes secret values, credential bodies, or transcript content (only structural markers and goal hashes are derived). Requires the `agentic` feature flag.
 
-These tools share their names and behavior with the corresponding RPC methods documented in [API_REFERENCE.md](API_REFERENCE.md#agent-visibility); the MCP exposure is read-only by design (observer-independence I1). Every mutator -- `refresh_*`, `set_visibility_capture_tier`, `set_firewall_mode`, `approve_agent` / `revoke_agent_approval`, `request_response_action` / `undo_response_action` / `export_visibility_case`, `set_policy_pack`, `attest_policy_evaluation`, `request_zone_promotion` / `decide_zone_promotion` -- plus the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are operator/UI control-plane only and are intentionally **not** exposed as MCP tools. An observed agent can read every structural finding about itself but cannot weaken, silence, or self-approve the controls that watch it.
+These tools share their names and behavior with the corresponding RPC methods documented in [API_REFERENCE.md](API_REFERENCE.md#agent-visibility); the MCP exposure is read-only by design (observer-independence I1). Every mutator -- `refresh_*`, `set_visibility_capture_tier`, `acknowledge_agent` / `unacknowledge_agent` -- plus the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are operator/UI control-plane only and are intentionally **not** exposed as MCP tools. An observed agent can read every structural finding about itself but cannot weaken, silence, or self-acknowledge the controls that watch it.
 
 ### `get_mcp_inventory`
 
@@ -526,7 +534,7 @@ READ-ONLY. Get per-agent recursion/delegation analysis derived from agent transc
 
 ### `get_agent_inventory`
 
-READ-ONLY. Operator inventory of every supported agent with any footprint on this host. Each entry has `agent_type`, `display_name`, a `classification` (`approved`/`shadow`/`unmanaged`/`unknown`), the installed/discovered/observer_enabled/approved booleans, and per-agent `mcp_endpoint_count`, `component_count`, `alertable_finding_count`. The reasoning plane can read its own classification but cannot change the operator allow-list. Metadata-only.
+READ-ONLY. Operator inventory of every supported agent with any footprint on this host. Each entry has `agent_type`, `display_name`, a `classification` (`acknowledged`/`shadow`/`new`), the installed/discovered/observer_enabled/acknowledged booleans, and per-agent `mcp_endpoint_count`, `component_count`, `alertable_finding_count`. The reasoning plane can read its own classification but cannot self-acknowledge. Metadata-only.
 
 **Parameters**: None
 
@@ -618,53 +626,21 @@ READ-ONLY. The memory/RAG inventory: discovered persistent context stores (vecto
 
 **Parameters**: None
 
-### `get_firewall_status`
+### `get_firewall_status` (retired 1.7.0)
 
-READ-ONLY. The tool-call firewall status envelope: current `mode` (`recommend`/`confirm`/`block`), `receipt_count`, `alertable_count`, `catastrophic_count`, `pending_confirmation_count`, `chain_intact`, `first_broken_index`, and `chain_head_hash`. Reading the mode does not let the agent change it (`set_firewall_mode` is operator-only).
+Removed from MCP and RPC. Use host blast radius / harness detection instead.
 
-**Parameters**: None
+### `get_firewall_evaluations` (retired 1.7.0)
 
-### `get_firewall_evaluations`
+Removed from MCP and RPC.
 
-READ-ONLY. The hash-chained tool-call firewall receipts: per evaluated tool call the verdict (`allow`/`recommend`/`confirm`/`block`), severity, catastrophic flag, triggering rule, `resolved` state, and `prev_hash`/`receipt_hash` chain links. Metadata-only.
+### `get_response_action_catalog` / `get_response_action_history` (retired 1.7.0)
 
-**Parameters**: None
+Removed from MCP and RPC (INC-11 ADR response / case export).
 
-### `get_response_action_catalog`
+### `get_policy_pack` / `get_policy_evaluation` / `get_policy_attestations` / `get_zone_promotions` (retired 1.7.0)
 
-READ-ONLY. The catalog of available response-action kinds: each entry carries `kind`, `description`, `reversible`, `operator_gated`, `simulate_required`, and `wired`. `wired` indicates whether the action's live side-effect primitive is implemented in this build; when false, a non-simulated request records an auditable operator-decision intent only (no live containment). Requesting an action (`request_response_action`) is operator-only.
-
-**Parameters**: None
-
-### `get_response_action_history`
-
-READ-ONLY. The append-only response-action history: each requested/simulated/applied/undone action with kind, target, reason, simulated flag, timestamps, and outcome. Metadata-only.
-
-**Parameters**: None
-
-### `get_policy_pack`
-
-READ-ONLY. The active enterprise policy pack: `pack_id`, `version`, and the declarative rules (each with kind, parameters, and the severity of a violation). Defaults to the built-in `EDAMAME Baseline` pack. Changing the pack (`set_policy_pack`) is operator-only.
-
-**Parameters**: None
-
-### `get_policy_evaluation`
-
-READ-ONLY. The most recent policy-pack evaluation: overall `compliant` flag, `violated_rules`/`total_rules` counts, and a per-rule pass/fail result with the deterministic inputs that drove each verdict.
-
-**Parameters**: None
-
-### `get_policy_attestations`
-
-READ-ONLY. The attestation log: each tamper-evident attestation with its subject (policy evaluation), the SHA-256 `content_digest`, and the timestamp. Producing an attestation (`attest_policy_evaluation`) is operator-only.
-
-**Parameters**: None
-
-### `get_zone_promotions`
-
-READ-ONLY. The cross-zone promotion log: each operator request to let an agent operate in a more-trusted firewall origin zone, with `promotion_id`, agent, target zone, reason, status (`requested`/`approved`/`denied`), and decision timestamp. Requesting/deciding a promotion is operator-only -- an observed agent cannot self-promote.
-
-**Parameters**: None
+Removed from MCP and RPC (INC-13 policy packs / attestation / zone promotion).
 
 ### `get_agent_fleet_overview`
 
@@ -681,7 +657,7 @@ READ-ONLY. Deterministic failed-intent clusters: agent tool errors grouped by st
 - `window_minutes` (integer, optional): Look-back window; `0` uses the 24h default.
 - `agent_type` (string, optional): Scope to one agent type; empty covers all supported agents.
 
-> **Observer-independence**: The visibility control-plane mutators (every `refresh_*`, `set_visibility_capture_tier`, `set_firewall_mode`, `approve_agent`, `revoke_agent_approval`, `request_response_action`, `undo_response_action`, `export_visibility_case`, `set_policy_pack`, `attest_policy_evaluation`, `request_zone_promotion`, `decide_zone_promotion`) and the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are intentionally **not** exposed via MCP. Refresh is implicit (lazy TTL); enforcement, governance, and capture-tier are operator/UI surfaces. Use the EDAMAME app (Agents tab) or `edamame_cli rpc` for those.
+> **Observer-independence**: The visibility control-plane mutators (every `refresh_*`, `set_visibility_capture_tier`, `acknowledge_agent`, `unacknowledge_agent`) and the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are intentionally **not** exposed via MCP. Refresh is implicit (lazy TTL); first-seen acknowledgment and capture-tier are operator/UI surfaces. Use the EDAMAME app (Agents tab) or `edamame_cli rpc` for those.
 
 ---
 
@@ -855,7 +831,7 @@ Use a per-client credential (from pairing) or shared PSK:
 | 36 | `get_agent_component_inventories` | Visibility | Per-agent component inventory (read-only) |
 | 37 | `get_capability_graph` | Visibility | Agent capability graph edges (read-only) |
 | 38 | `get_recursion_risk` | Visibility | Recursion/delegation tree risk (read-only) |
-| 39 | `get_agent_inventory` | Visibility | Agent inventory + shadow classification (read-only) |
+| 39 | `get_agent_inventory` | Visibility | Agent inventory + first-seen classification (read-only) |
 | 40 | `get_graph_reachability` | Visibility | Per-agent trust-zone reachability (read-only) |
 | 41 | `get_effective_capabilities` | Visibility | Per-agent transitive capabilities (read-only) |
 | 42 | `list_recent_runs` | Visibility | Flight-recorder run index (read-only) |
@@ -867,13 +843,5 @@ Use a per-client credential (from pairing) or shared PSK:
 | 48 | `get_dataflow_maps` | Visibility | Per-agent source->sink data-flow maps (read-only) |
 | 49 | `get_dataflow_map` | Visibility | One agent's data-flow map (read-only) |
 | 50 | `get_memory_inventory` | Visibility | Agent memory/RAG store inventory (read-only) |
-| 51 | `get_firewall_status` | Visibility | Tool-call firewall status envelope (read-only) |
-| 52 | `get_firewall_evaluations` | Visibility | Hash-chained firewall receipts (read-only) |
-| 53 | `get_response_action_catalog` | Visibility | Response-action kinds catalog (read-only) |
-| 54 | `get_response_action_history` | Visibility | Response-action history (read-only) |
-| 55 | `get_policy_pack` | Visibility | Active enterprise policy pack (read-only) |
-| 56 | `get_policy_evaluation` | Visibility | Latest policy-pack evaluation (read-only) |
-| 57 | `get_policy_attestations` | Visibility | Tamper-evident attestation log (read-only) |
-| 58 | `get_zone_promotions` | Visibility | Cross-zone promotion log (read-only) |
-| 59 | `get_agent_fleet_overview` | Fleet | Fleet command-centre rollup (read-only) |
-| 60 | `get_agent_failure_clusters` | Fleet | Deterministic failed-intent clusters (read-only) |
+| 51 | `get_agent_fleet_overview` | Fleet | Fleet command-centre rollup (read-only) |
+| 52 | `get_agent_failure_clusters` | Fleet | Deterministic failed-intent clusters (read-only) |

@@ -838,11 +838,11 @@ AI-powered security automation with multiple LLM providers.
 | `get_vulnerability_debug_trace` | report_id: String | String | Per-check evaluation trace for a specific report |
 | `debug_run_vulnerability_detector_tick` | -- | String | Force an attack-pattern-detector tick (diagnostic) |
 | `get_vulnerability_detector_status` | -- | String | Get attack pattern detector runtime status |
-| `list_agent_plugins` | -- | String | List supported agent plugins (Cursor/Claude/...) |
-| `get_agent_plugin_status` | agent_type: String | String | Status of a specific agent plugin |
-| `provision_agent_plugin` | agent_type, workspace_root | String | Install or update an agent plugin |
-| `test_agent_plugin` | agent_type: String | String | Run an agent plugin's self-test |
-| `uninstall_agent_plugin` | agent_type: String | String | Remove an agent plugin |
+| `list_agent_plugins` | -- | String | Read-only registry of supported agents (icons/metadata) |
+| ~~`get_agent_plugin_status`~~ | -- | -- | **Retired 1.7.0** |
+| ~~`provision_agent_plugin`~~ | -- | -- | **Retired 1.7.0** |
+| ~~`test_agent_plugin`~~ | -- | -- | **Retired 1.7.0** |
+| ~~`uninstall_agent_plugin`~~ | -- | -- | **Retired 1.7.0** |
 
 ### MCP Server (10 methods)
 

@@ -2076,9 +2076,13 @@ agentic_prune_expired_dismissal_rules() -> String
 
 Force a single sweep that removes any dismissal rules whose `ttl_secs` has elapsed. Returns `{ "success": true, "removed": <count> }`. The detector tick performs this sweep automatically; this RPC is for operator-driven maintenance.
 
-### Agent Plugins
+### Agent Plugins (read-only registry; mutators retired 1.7.0)
 
-Provisioning helpers for first-class third-party agent integrations (Cursor, Claude Code, Claude Desktop, etc.). Each plugin owns its install layout, configuration, and uninstall routine; the API surfaces here are CLI/UI thin wrappers over `edamame_foundation::agent_plugin`. Requires the `agentic` feature flag.
+**Retired in EDAMAME 1.7.0:** `provision_agent_plugin`, `get_agent_plugin_status`,
+`test_agent_plugin`, `get_agent_plugin_health`, and `uninstall_agent_plugin` were
+removed from the product. Host-side transcript observation is automatic; Level-2
+plugin install is no longer exposed. **`list_agent_plugins` remains** for registry
+metadata and UI icons.
 
 #### list_agent_plugins
 
@@ -2086,47 +2090,12 @@ Provisioning helpers for first-class third-party agent integrations (Cursor, Cla
 list_agent_plugins() -> String
 ```
 
-Returns a JSON array of supported agent plugins with their metadata (display name, repo, strategy kind, sort order, install state, version, install path).
+Returns a JSON array of supported agent types with registry metadata (display name,
+repo, strategy kind, sort order, discovery layout). Read-only; no install state in 1.7.0+.
 
-#### get_agent_plugin_status
-
-```
-get_agent_plugin_status(agent_type: String) -> String
-```
-
-Returns a JSON `AgentPluginStatus` record for the given agent type (e.g. `cursor`, `claude_code`, `claude_desktop`): install state, version, install path, error (if any), and display metadata.
-
-#### provision_agent_plugin
-
-```
-provision_agent_plugin(agent_type: String, workspace_root: String) -> String
-```
-
-Install or update the agent plugin of the given type into `workspace_root`. Standalone builds run the operation in-process; managed deployments delegate to the helper service. Returns JSON `AgentPluginProvisionResult` with `success`, `version`, `install_path`, and a human-readable `message`.
-
-#### test_agent_plugin
-
-```
-test_agent_plugin(agent_type: String) -> String
-```
-
-Run the plugin's self-test (typically: ensure binaries are reachable and configuration is valid) and return JSON describing the outcome. Used by the UI to surface "Plugin healthy" / "Plugin broken: <reason>" badges.
-
-#### get_agent_plugin_health
-
-```
-get_agent_plugin_health(agent_type: String) -> String
-```
-
-Return a richer health JSON for the given agent plugin: install state, version, last self-test outcome, MCP bridge reachability, and any background telemetry (e.g. transcript observer status) the plugin contributes. Used by the UI's plugin detail view.
-
-#### uninstall_agent_plugin
-
-```
-uninstall_agent_plugin(agent_type: String) -> String
-```
-
-Remove the agent plugin of the given type from disk and clear its configuration. Returns JSON describing whether the operation succeeded and any removed paths.
+<!-- RETIRED 1.7.0 -- the following RPCs are documented for historical reference only:
+get_agent_plugin_status, provision_agent_plugin, test_agent_plugin,
+get_agent_plugin_health, uninstall_agent_plugin -->
 
 ### External Transcript Observer
 
@@ -2438,9 +2407,16 @@ Read the persisted crash-reports preference. Mirror of the `crash_reports_enable
 
 ## Agent Visibility
 
-Agent-visibility surface spanning the staged roadmap (Stage A discovery through Stage D+ governance): MCP server discovery + risk analysis, agent component inventory, capability graph + trust-zone reachability, recursion/delegation detection, the hash-chained run flight recorder, goal/delegation drift timelines, sensitive data-flow / memory / agent-to-agent maps, the tool-call firewall, ADR response actions + case export, and enterprise policy packs / attestations / cross-zone approval. Requires the `agentic` feature flag. Rich, deeply-nested domain data is returned as a JSON `String` (same convention as agentic findings/history); only the capture tier, the compact summary, and the roadmap get a typed FRB mirror. Read RPCs lazily ensure a fresh snapshot (TTL-bounded `ensure_*`/`get_*`) so a single-shot caller gets data without a separate refresh call.
+Agent-visibility surface spanning MCP discovery, component inventory, capability graph,
+recursion, flight recorder, drift timelines, and data-flow / memory / A2A maps.
+**Retired 1.7.0:** tool-call firewall (INC-10), ADR response/case export (INC-11),
+and policy pack / attestation / zone-promotion RPCs (INC-13). Prevention via
+**nono** / **srt** harnesses on blast radius. First-seen acknowledgment uses
+`acknowledge_agent` / `unacknowledge_agent` (renamed from legacy
+`approve_agent` / `revoke_agent_approval`). Requires the `agentic` feature flag.
 
-Observer-independence (I1): the read RPCs are also exposed as read-only MCP tools (see [MCP.md](MCP.md#agent-visibility-tools)), but every **mutator** here (`refresh_*`, `set_firewall_mode`, `approve_agent`/`revoke_agent_approval`, `request_response_action`/`undo_response_action`, `set_policy_pack`, `attest_policy_evaluation`, `request_zone_promotion`/`decide_zone_promotion`, `set_visibility_capture_tier`) is operator/UI control-plane only and is never an MCP tool -- an observed agent must not be able to weaken, silence, or self-approve the controls that watch it. Staged enforcement (I6): the tool-call firewall defaults to `recommend` (never gates); `confirm`/`block` are opt-in operator modes. See `VISIBILITYIMPROVEMENTS.md`.
+Observer-independence (I1): read RPCs may be exposed as read-only MCP tools where
+still compiled; mutators are operator/UI only. See `VISIBILITYIMPROVEMENTS.md`.
 
 **Source**: `api/api_visibility.rs`
 
@@ -2708,189 +2684,19 @@ get_agent_subprocess_usage(window_minutes: u64) -> String
 
 Return agent critical-subprocess usage as JSON -- read-only, derived, LLM-free. Reveals which discovered agents are/have been spawning `ssh`/`scp`/`nc`/shells/`docker`/... by classifying the L7 process lineage on captured sessions and attributing it to a known agent identity. Findings are capped at MEDIUM (reveal, not alert) and demo-guarded in the CoreManager method. `window_minutes` selects the timeline projection: `0` = live capture horizon (used by blast radius + the MCP read tool); `>0` = project the retained 30-day history over that many minutes (the UI's 24h / 7d / 30d selector). MCP-safe read.
 
-### get_firewall_status
-
-```
-get_firewall_status() -> String
-```
-
-(INC-10 tool-call firewall) Return the firewall status envelope as JSON: current `mode` (`recommend`/`confirm`/`block`), `receipt_count`, `alertable_count`, `catastrophic_count`, `pending_confirmation_count` (always 0 in `recommend` -- it never gates, I6), `chain_intact`, `first_broken_index`, and `chain_head_hash`. MCP-safe read.
-
-### get_firewall_evaluations
-
-```
-get_firewall_evaluations() -> String
-```
-
-(INC-10) Return the hash-chained tool-call firewall receipts as a JSON array: per evaluated tool call the verdict (`allow`/`recommend`/`confirm`/`block`), severity, catastrophic flag, the triggering rule, `resolved` state, and `prev_hash`/`receipt_hash` chain links. MCP-safe read.
-
-### refresh_firewall_evaluations
-
-```
-refresh_firewall_evaluations() -> String
-```
-
-(INC-10) Force a re-evaluation of recent tool calls against the active firewall rules. Returns `{"success": true, "receipt_count": N}`. Operator/UI refresh; reads refresh lazily.
-
-### set_firewall_mode
-
-```
-set_firewall_mode(mode: String) -> String
-```
-
-(INC-10) Set the firewall enforcement mode. Accepts `recommend` (default, never gates -- I6), `confirm` (gates non-catastrophic verdicts pending operator confirmation), or `block` (gates catastrophic verdicts outright). Returns `{"success": bool, ...}`; `success:false` with an `error` for an unknown mode. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not relax its own firewall).
-
-### get_agent_enforcement_capabilities
-
-```
-get_agent_enforcement_capabilities() -> String
-```
-
-(A3 truth-in-UX) Return the per-agent pre-execution enforcement capability catalog as a JSON array. For each supported agent: the achievable enforcement `tier`, gate-able vs observe-only tool classes, the native hook mechanism, whether our plugin currently wires it (`plugin_hook_wired`), and the validation confidence. Read-only, deterministic (I3). Consumers MUST surface `plugin_hook_wired` / `validation` alongside `tier` so a not-yet-wired ceiling never reads as active enforcement. MCP-safe read.
-
-### evaluate_pre_execution_tool_call
-
-```
-evaluate_pre_execution_tool_call(request_json: String) -> String
-```
-
-(A3 Stage C live gating) The agent hook's single intake tool for the pre-execution tool-call firewall. A fresh request submits a metadata-only proposed tool call (I5: `agent_type`, `tool_name`, `tool_class`, taint, sink zone -- never raw args); it is scored, clamped by the agent's enforcement ceiling, and returns `{decision: allow|hold|block, pending_id?, verdict, score, severity, rationale, mode, gated, hold_ttl_secs}` -- when it gates, a `PendingToolCall` is recorded. With a non-empty `pending_id` it instead polls a previously-held call, returning `{decision, pending_id, status}`. Unknown/pruned ids and parse errors fail closed to `block`. MCP-safe intake (reasoning-plane; it can never approve a held call -- that is `resolve_pending_tool_call`, RPC-only).
-
-### get_pending_tool_calls
-
-```
-get_pending_tool_calls() -> String
-```
-
-(A3) Return the pending-approvals queue (held + recently resolved pre-execution tool calls) as a JSON array, TTL-swept. Metadata only (I5). Operator read surface for the confirmation UI.
-
-### resolve_pending_tool_call
-
-```
-resolve_pending_tool_call(pending_id: String, approve: bool) -> String
-```
-
-(A3) Approve or deny a held pre-execution tool call. Returns `{"success": bool, ...}`; `success:false` with an `error` when the id is unknown or the entry was already resolved/expired. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must NEVER approve its own held call; that would defeat the entire synchronous gate).
-
-### get_response_action_catalog
-
-```
-get_response_action_catalog() -> String
-```
-
-(INC-11 response actions) Return the catalog of available response-action kinds as a JSON array. Each entry carries `kind`, `description`, `reversible`, `operator_gated`, `simulate_required`, and `wired`. `wired` indicates whether the action's live side-effect primitive is actually implemented in this build (`pause_agent`, `require_confirm_all_calls`, and -- when the `mcp` feature is compiled in -- `revoke_tool_grant`); when `wired` is false, a non-simulated request records an auditable operator-decision intent but applies no live containment, so consumers MUST present it as intent-only rather than executed. MCP-safe read.
-
-### get_response_action_history
-
-```
-get_response_action_history() -> String
-```
-
-(INC-11) Return the append-only response-action history as a JSON array: each requested/simulated/applied/undone action with kind, target, reason, simulated flag, timestamps, and outcome. MCP-safe read.
-
-### request_response_action
-
-```
-request_response_action(kind: String, target_ref: String, reason: String, simulated: bool) -> String
-```
-
-(INC-11) Request a response action (e.g. quarantine a session, revoke an agent, isolate a memory store). Returns `{"success": true, "record": {...}}` on success; `success:false` with an `error` when the kind is unknown, the target is empty, or an irreversible action was requested without a prior simulate run (I6 requires a `simulated:true` pass first). Operator-only mutator -- NOT an MCP tool (I1).
-
-### undo_response_action
-
-```
-undo_response_action(action_id: String) -> String
-```
-
-(INC-11) Undo a previously-applied reversible response action by id. Returns `{"success": bool}` (`false` when the id is unknown or the action is irreversible). Operator-only mutator -- NOT an MCP tool (I1).
-
-### export_visibility_case
-
-```
-export_visibility_case(run_id: String) -> String
-```
-
-(INC-11 case export) Assemble a single portable incident-case bundle for one run as JSON: the flight record, correlated divergence/attack-pattern findings, the agent's drift timeline, data-flow/memory/A2A context, and any response actions taken. Returns `{}` when the run is unknown. Operator/UI export (not an MCP tool).
-
-### get_policy_pack
-
-```
-get_policy_pack() -> String
-```
-
-(INC-13 governance) Return the active enterprise policy pack as JSON: `pack_id`, `version`, and the declarative rules (each with kind, parameters, and the severity of a violation). Defaults to the built-in `EDAMAME Baseline` pack (7 rules). MCP-safe read.
-
-### get_policy_evaluation
-
-```
-get_policy_evaluation() -> String
-```
-
-(INC-13) Return the most recent policy-pack evaluation as JSON: overall `compliant` flag, `violated_rules`/`total_rules` counts, and a per-rule pass/fail result with the deterministic inputs that drove each verdict. MCP-safe read.
-
-### refresh_policy_evaluation
-
-```
-refresh_policy_evaluation() -> String
-```
-
-(INC-13) Re-evaluate the active policy pack against freshly-assembled deterministic INC-5..13 inputs. Returns `{"success": true, "compliant": bool, "violated_rules": N, "total_rules": M}`. Reads refresh lazily.
-
-### set_policy_pack
-
-```
-set_policy_pack(pack_json: String) -> String
-```
-
-(INC-13) Replace the active policy pack with a caller-supplied JSON `PolicyPack` (persisted to `VisibilityPreferences`). Returns `{"success": true, "pack_id": ..., "version": ..., "rule_count": N}` on success; `success:false` with an `error` when the JSON is invalid. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not weaken its own governance pack).
-
-### simulate_policy_pack
-
-```
-simulate_policy_pack(pack_json: String) -> String
-```
-
-(INC-13) Policy simulator: dry-run a candidate `PolicyPack` JSON against the live policy-inputs snapshot without persisting the pack or refreshing any state. Returns the `{"success": true, "simulation": {...}}` envelope where the simulation payload carries the inputs snapshot, the evaluations of both the active and the candidate pack, the per-rule delta (`changed_rules`), and the top-level `would_change_compliance` flip flag -- consumed by the app's "preview impact" panel before `set_policy_pack`. `success:false` with an `error` when the candidate JSON is invalid. Operator-only (never MCP).
-
-### attest_policy_evaluation
-
-```
-attest_policy_evaluation() -> String
-```
-
-(INC-13) Produce a content-addressed, tamper-evident attestation (SHA-256 `content_digest`) over the current policy evaluation and append it to the attestation log. Returns `{"success": true, "attestation": {...}}`. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not fabricate its own compliance attestation).
-
-### get_policy_attestations
-
-```
-get_policy_attestations() -> String
-```
-
-(INC-13) Return the attestation log as a JSON array: each attestation with its subject (policy evaluation), the SHA-256 `content_digest`, and the timestamp. Use `content_digest` to verify tamper-evidence against the attested object. MCP-safe read.
-
-### get_zone_promotions
-
-```
-get_zone_promotions() -> String
-```
-
-(INC-13 cross-zone approval) Return the cross-zone promotion log as a JSON array: each operator request to let an agent operate in a more-trusted firewall origin zone, with its `promotion_id`, agent, target zone, reason, status (`requested`/`approved`/`denied`), and decision timestamp. MCP-safe read.
-
-### request_zone_promotion
-
-```
-request_zone_promotion(agent_type: String, target_zone: String, reason: String) -> String
-```
-
-(INC-13) Request that an agent be promoted into a more-trusted firewall origin zone (e.g. `trust1`). Returns `{"success": true, "record": {...}}` with a `requested` record; `success:false` with an `error` for an invalid target zone. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not self-promote into a trusted zone).
-
-### decide_zone_promotion
-
-```
-decide_zone_promotion(promotion_id: String, approve: bool) -> String
-```
-
-(INC-13) Operator-decide a pending zone promotion by id: `approve:true` transitions it to `approved`, `false` to `denied`. Returns `{"success": bool}` (`false` when no matching `requested` record exists). Operator-only mutator -- NOT an MCP tool (I1).
+<!-- RETIRED 1.7.0: tool-call firewall + pre-execution enforcement RPCs removed.
+Historical names: get_firewall_status, get_firewall_evaluations, refresh_firewall_evaluations,
+set_firewall_mode, get_agent_enforcement_capabilities, evaluate_pre_execution_tool_call,
+get_pending_tool_calls, resolve_pending_tool_call. Prevention: nono/srt harnesses on blast radius. -->
+
+<!-- RETIRED 1.7.0: ADR response / case export (INC-11) removed.
+Historical names: get_response_action_catalog, get_response_action_history,
+request_response_action, undo_response_action, export_visibility_case. -->
+
+<!-- RETIRED 1.7.0: policy packs / attestation / zone promotion (INC-13) removed.
+Historical names: get_policy_pack, get_policy_evaluation, refresh_policy_evaluation,
+set_policy_pack, simulate_policy_pack, attest_policy_evaluation, get_policy_attestations,
+get_zone_promotions, request_zone_promotion, decide_zone_promotion. -->
 
 ### get_agent_inventory
 
@@ -2898,23 +2704,27 @@ decide_zone_promotion(promotion_id: String, approve: bool) -> String
 get_agent_inventory() -> String
 ```
 
-(INC-10 shadow-agent classification) Return the operator agent inventory as a JSON array: every supported agent with any footprint on this host, each with `agent_type`, `display_name`, a `classification` (`approved`/`shadow`/`unmanaged`/`unknown`), the installed/discovered/observer_enabled/approved booleans, and per-agent endpoint/component/alertable counts. MCP-safe read.
+Return the operator agent inventory as a JSON array: every supported agent with any footprint on this host, each with `agent_type`, `display_name`, a `classification` (`acknowledged` / `shadow` / `new`), the installed/discovered/observer_enabled/acknowledged booleans, and per-agent endpoint/component/alertable counts. MCP-safe read.
 
-### approve_agent
-
-```
-approve_agent(agent_type: String) -> String
-```
-
-(INC-10) Operator: add an agent type to the approved allow-list, clearing its shadow classification. Returns `{"success": bool, "changed": bool}`; `success:false` with an `error` for an empty agent type. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not allow-list itself).
-
-### revoke_agent_approval
+### acknowledge_agent
 
 ```
-revoke_agent_approval(agent_type: String) -> String
+acknowledge_agent(agent_type: String) -> String
 ```
 
-(INC-10) Operator: remove an agent type from the approved allow-list. Returns `{"success": bool, "changed": bool}`. Operator-only mutator -- NOT an MCP tool (I1).
+Operator first-seen acknowledgment ("yes, this is me"): add an agent type to the acknowledged list, clearing its `new` / `shadow` classification. Returns `{"success": bool, "changed": bool}`; `success:false` with an `error` for an empty agent type. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not self-acknowledge).
+
+> Legacy wire name (removed): `approve_agent`.
+
+### unacknowledge_agent
+
+```
+unacknowledge_agent(agent_type: String) -> String
+```
+
+Operator: revert an agent type to an unacknowledged first-seen footprint. Returns `{"success": bool, "changed": bool}`. Operator-only mutator -- NOT an MCP tool (I1).
+
+> Legacy wire name (removed): `revoke_agent_approval`.
 
 ### get_visibility_capture_tier
 
