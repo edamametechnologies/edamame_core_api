@@ -2676,6 +2676,18 @@ get_trust_controls_scorecard() -> String
 
 Return the Trust Controls (trustcontrols.ai) scorecard as JSON: static per-control coverage grades and enforcement flags (from the trustcontrols.ai catalog, encoded in `edamame_foundation::agent_trust_controls`) plus live finding attribution that reuses the same `OWASP-<id>` reference pipeline, with the `headline_status` derived directly from the attributed alertable/critical findings. The trustcontrols.ai counterpart to `get_owasp_scorecard`. Read-only, derived; no separate refresh. MCP-safe read.
 
+### get_atlas_scorecard
+
+```
+get_atlas_scorecard() -> String
+```
+
+Return the MITRE ATLAS runtime detection coverage map as JSON: the scoped catalog of ATLAS techniques a host/network runtime observer can actually see (39 parent techniques across 12 tactics, encoded in `edamame_foundation::agent_atlas`), each with a static coverage grade, a `coverage_rationale` naming the backing telemetry, and live finding attribution. Grouped by tactic in matrix order as `tactics: [{tactic_id, tactic, rows: [...]}]`, with `technique_count` so a consumer can state the denominator against the 170+ ATLAS publishes. Techniques outside a runtime observer's reach (training-time poisoning, model theft, adversary research infrastructure) are absent from the catalog rather than reported as uncovered.
+
+Unlike `get_trust_controls_scorecard`, this does **not** re-project the `OWASP-<id>` pipeline: findings carry their own `AML.T<id>` reference tokens, so a technique row is independent evidence. Each row's `owasp_refs` is a displayed cross-reference only. `headline_status` is derived from the attributed alertable findings on the same rule as the sibling scorecards. Read-only, derived; no separate refresh.
+
+**Not an MCP tool (operator-only).** Every row's `coverage_rationale` names the exact telemetry that backs or fails to back a detection claim, which in a reasoning plane is an evasion guide. Read-only is not sufficient justification for MCP exposure when the content itself is the hazard.
+
 ### get_agent_subprocess_usage
 
 ```
