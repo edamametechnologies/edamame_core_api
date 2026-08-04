@@ -540,6 +540,7 @@ Behavioral-model payloads use the v3 schema:
 mcp_start_server(port, psk, enable_cors, listen_all_interfaces) -> String
 mcp_stop_server() -> String
 mcp_get_server_status() -> String
+mcp_generate_psk() -> String
 mcpApprovePairing(request_id: String) -> String
 mcpRejectPairing(request_id: String) -> String
 mcpListPairedClients() -> String
@@ -727,8 +728,8 @@ Email breach monitoring via HaveIBeenPwned integration. Supports dynamic add/rem
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `add_pwned_email` | email: String | bool | Monitor email for breaches |
-| `remove_pwned_email` | email: String | bool | Stop monitoring email |
+| `add_pwned_email` | email: String | String | Monitor email for breaches (fallible envelope) |
+| `remove_pwned_email` | email: String | String | Stop monitoring email (fallible envelope) |
 | `get_breaches_for_email` | email: String | PwnedAPI | Breaches for specific email |
 | `get_all_breaches` | -- | PwnedAPI | All breaches across emails |
 | `get_breach_by_name_and_email` | name, email | Option\<PwnedItemAPI\> | Specific breach details |
@@ -844,7 +845,7 @@ AI-powered security automation with multiple LLM providers.
 | ~~`test_agent_plugin`~~ | -- | -- | **Retired 1.7.0** |
 | ~~`uninstall_agent_plugin`~~ | -- | -- | **Retired 1.7.0** |
 
-### MCP Server (10 methods)
+### MCP Server (11 methods)
 
 MCP server management and pairing (feature-gated: `mcp`).
 
@@ -853,6 +854,7 @@ MCP server management and pairing (feature-gated: `mcp`).
 | `mcp_start_server` | port, psk, enable_cors, listen_all_interfaces | String | Start MCP server |
 | `mcp_stop_server` | -- | String | Stop MCP server |
 | `mcp_get_server_status` | -- | String | Server running status |
+| `mcp_generate_psk` | -- | String | Generate a secure base64 PSK (32+ chars) |
 | `mcpApprovePairing` | request_id: String | String | Approve a pending pairing request |
 | `mcpRejectPairing` | request_id: String | String | Reject a pending pairing request |
 | `mcpListPairedClients` | -- | String | List all paired clients (JSON array) |

@@ -983,18 +983,37 @@ Email breach monitoring via HaveIBeenPwned integration. Requires the `pwned` fea
 ### add_pwned_email
 
 ```
-add_pwned_email(email: String) -> bool
+add_pwned_email(email: String) -> String
 ```
 
-Add an email address to monitor for breaches. Returns true if added successfully.
+Add an email address to monitor for breaches. Fallible envelope:
+`{ "success": bool, "error": string?, "outcome": string, "tracked": bool? }`.
+
+`success` means the requested end state holds, so re-adding an already-monitored
+address is a success (`outcome: "unchanged"`), not an error. `tracked` is whether
+the address is monitored after the call — `true` on success, and `null` when the
+call did not succeed, because a refusal leaves the prior state intact and a flat
+`false` there would be a fresh false claim.
+
+| `outcome` | `success` | Meaning |
+|---|---|---|
+| `changed` | `true` | Address was not monitored and now is |
+| `unchanged` | `true` | Address was already monitored; idempotent repeat |
+| `invalid_email` | `false` | Address was empty or whitespace-only |
+| `demo_mode_no_op` | `false` | Demo mode is active and its monitored address set is fixed |
+| `failed` | `false` | Registry write failed; `error` carries the reason |
 
 ### remove_pwned_email
 
 ```
-remove_pwned_email(email: String) -> bool
+remove_pwned_email(email: String) -> String
 ```
 
-Remove an email from breach monitoring. Returns true if removed.
+Remove an email from breach monitoring. Same envelope and `outcome` vocabulary as
+`add_pwned_email`, with `changed` meaning the address was monitored and now is not,
+and `unchanged` meaning it was already absent. `tracked` is `false` on success and
+`null` otherwise — notably, a `demo_mode_no_op` refusal leaves the address
+monitored, so reporting `false` would be wrong.
 
 ### get_breaches_for_email
 
@@ -2801,6 +2820,18 @@ mcp_get_server_status() -> String
 ```
 
 Returns the MCP server status (running/stopped, port, etc.).
+
+### mcp_generate_psk
+
+```
+mcp_generate_psk() -> String
+```
+
+Generate a cryptographically secure base64 PSK suitable for shared-PSK mode
+(at least 32 characters, satisfying `mcp_start_server`'s minimum). Pure
+random-bytes-plus-base64 with no core state, so unlike every other method here
+it is also callable without an initialized runtime -- which is what lets
+`edamame-posture mcp-generate-psk` run as a standalone CLI command.
 
 ### mcp_approve_pairing
 

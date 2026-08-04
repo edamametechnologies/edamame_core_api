@@ -243,7 +243,7 @@ Get the full security posture score: overall score (0-100, stars 0-5), sub-score
 
 ### `add_pwned_email`
 
-Add an email address to HIBP (HaveIBeenPwned) breach monitoring. The email will be checked against the HIBP database and continuously monitored for new breaches. Returns true if successfully added. Use this to dynamically register identities for breach monitoring -- for example, registering the operator's email during an introspection loop.
+Add an email address to HIBP (HaveIBeenPwned) breach monitoring. The email will be checked against the HIBP database and continuously monitored for new breaches. Use this to dynamically register identities for breach monitoring -- for example, registering the operator's email during an introspection loop.
 
 **Parameters**:
 
@@ -251,13 +251,23 @@ Add an email address to HIBP (HaveIBeenPwned) breach monitoring. The email will 
 |------|------|----------|-------------|
 | `email` | string | Yes | Email address to add to breach monitoring |
 
-**Returns**: JSON with `success` (boolean), `email` (string), and `message` (string).
+**Returns**: JSON with `success` (boolean), `error` (string or null), `outcome` (string), `tracked` (boolean or null), `email` (string), and `message` (string).
+
+`success` means the requested end state now holds, so re-adding an already-monitored address is a success (`outcome: "unchanged"`), not an error. `tracked` is whether the address is monitored after the call: `true` on success, and `null` when the call did not succeed, since a refusal leaves the prior state intact.
+
+| `outcome` | `success` | Meaning |
+|---|---|---|
+| `changed` | `true` | Address was not monitored and now is |
+| `unchanged` | `true` | Address was already monitored; idempotent repeat |
+| `invalid_email` | `false` | Address was empty or whitespace-only |
+| `demo_mode_no_op` | `false` | Demo mode is active and its monitored address set is fixed |
+| `failed` | `false` | Registry write failed; `error` carries the reason |
 
 ---
 
 ### `remove_pwned_email`
 
-Remove an email address from HIBP breach monitoring. Returns true if successfully removed.
+Remove an email address from HIBP breach monitoring.
 
 **Parameters**:
 
@@ -265,7 +275,7 @@ Remove an email address from HIBP breach monitoring. Returns true if successfull
 |------|------|----------|-------------|
 | `email` | string | Yes | Email address to remove from breach monitoring |
 
-**Returns**: JSON with `success` (boolean), `email` (string), and `message` (string).
+**Returns**: Same shape and `outcome` vocabulary as `add_pwned_email`, with `changed` meaning the address was monitored and now is not, and `unchanged` meaning it was already absent. `tracked` is `false` on success and `null` otherwise -- notably, a `demo_mode_no_op` refusal leaves the address monitored, so reporting `false` would be wrong.
 
 ---
 
@@ -734,6 +744,7 @@ The MCP server is managed via API methods (also available as CLI commands via `e
 | `mcp_start_server(port, psk, enable_cors, listen_all_interfaces)` | `edamame-posture mcp-start [--port PORT] [--all-interfaces] [--enable-cors]` | Start MCP server |
 | `mcp_stop_server()` | `edamame-posture mcp-stop` | Stop MCP server |
 | `mcp_get_server_status()` | `edamame-posture mcp-status` | Check server status |
+| `mcp_generate_psk()` | `edamame-posture mcp-generate-psk` | Generate a secure base64 PSK (32+ chars) |
 | `mcp_approve_pairing(request_id)` (Flutter bridge: `mcpApprovePairing`) | (host app only) | Approve a pending pairing request |
 | `mcp_reject_pairing(request_id)` (Flutter bridge: `mcpRejectPairing`) | (host app only) | Reject a pending pairing request |
 | `mcp_list_paired_clients()` (Flutter bridge: `mcpListPairedClients`) | (host app only) | List all paired clients (JSON array) |
