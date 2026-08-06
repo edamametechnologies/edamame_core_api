@@ -2378,7 +2378,7 @@ Return `true` when the FIM event buffer currently contains at least one event fl
 
 ## Privacy
 
-Privacy preferences toggles for analytics and crash reporting. Persisted on disk and applied at runtime where possible. Persisted struct: `PrivacyPreferences` (see core repo invariants -- new fields MUST add `#[serde(default)]`).
+Privacy preferences toggles for analytics, crash reporting, and AI failure-detail export to Hub. Persisted on disk and applied at runtime where possible. Persisted struct: `PrivacyPreferences` (see core repo invariants -- new fields MUST add `#[serde(default)]`).
 
 **Source**: `api/api_privacy.rs`
 
@@ -2388,7 +2388,7 @@ Privacy preferences toggles for analytics and crash reporting. Persisted on disk
 get_privacy_preferences() -> PrivacyPreferencesAPI
 ```
 
-Return the current privacy preferences as a struct: `analytics_enabled`, `crash_reports_enabled`. Used by the Privacy settings tab.
+Return the current privacy preferences as a struct: `analytics_enabled`, `crash_reports_enabled`, `export_ai_failure_details`. Used by the Privacy settings tab.
 
 ### set_analytics_enabled
 
@@ -2406,6 +2406,14 @@ set_crash_reports_enabled(enabled: bool) -> ()
 
 Persist the crash-reports toggle. Crash reports are honored at app launch only; flipping this at runtime takes effect on next launch (the Flutter UI surfaces this with a snackbar).
 
+### set_export_ai_failure_details
+
+```
+set_export_ai_failure_details(enabled: bool) -> ()
+```
+
+Persist whether structured AI posture failure facts may be included on Hub `report_score`. Default is `false` (consumer opt-in). Facts are metadata-only (agent names, process basenames, harness slugs, secret labels) — never transcripts, env values, or secret content. Posture/Intune can force export via `EDAMAME_EXPORT_AI_FAILURE_DETAILS` / `--export-ai-failure-details` regardless of this toggle; the report's `ai` detail bundle then carries `mode: "forced"`.
+
 ### get_analytics_enabled
 
 ```
@@ -2421,6 +2429,14 @@ get_crash_reports_enabled() -> bool
 ```
 
 Read the persisted crash-reports preference. Mirror of the `crash_reports_enabled` field in `get_privacy_preferences`.
+
+### get_export_ai_failure_details
+
+```
+get_export_ai_failure_details() -> bool
+```
+
+Read the persisted AI failure-detail export preference. Mirror of the `export_ai_failure_details` field in `get_privacy_preferences`. Does not reflect posture force — use the `mode` field (`denied` | `enabled` | `forced`) of the `ai` bundle in the Hub wire field `details` for the effective mode.
 
 ---
 
