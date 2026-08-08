@@ -224,8 +224,8 @@ Example Posture CLI commands and the API calls they map to:
 
 | CLI Command | API Calls |
 |-------------|-----------|
-| `edamame-posture get-score` | `compute_score()` then `get_score(true)` |
-| `edamame-posture remediate-all-threats` | `get_score(false)` then `remediate(name, false)` for each threat |
+| `edamame-posture get-score` | `compute_score()` then `get_score(true, false)` |
+| `edamame-posture remediate-all-threats` | `get_score(false, false)` then `remediate(name, false)` for each threat |
 | `edamame-posture check-policy 3.5 "firewall" "SOC-2"` | `check_policy(3.5, [...], [...])` |
 | `edamame-posture lanscan` | `get_lanscan(true, false, false)` |
 | `edamame-posture get-sessions` | `get_sessions()` |
@@ -260,10 +260,11 @@ edamame-cli list-methods
 # Get method signature and types
 edamame-cli get-method-info get_score
 
-# Call API methods with JSON arguments
-edamame-cli rpc get_score '["true"]'
+# Call API methods with JSON arguments (named object args)
+edamame-cli rpc get_score '{"complete_only": true, "with_ai_details": false}'
+edamame-cli rpc get_score '{"complete_only": true, "with_ai_details": true}' --pretty
 edamame-cli rpc get_device_info --pretty
-edamame-cli rpc remediate '["firewall_disabled", "false"]'
+edamame-cli rpc remediate '{"name": "firewall_disabled", "dont_report": false}'
 
 # Interactive exploration
 edamame-cli interactive
@@ -284,11 +285,15 @@ All API methods are registered via the `rpc!()` macro, which generates:
 
 ```rust
 // Declaration
-rpc!(get_score(complete_only: bool) -> ScoreAPI);
+rpc!(get_score(complete_only: bool, with_ai_details: bool) -> ScoreAPI);
 
 // Generated async function (implemented by developer)
-pub async fn get_score_async(complete_only: bool) -> ScoreAPI {
-    CORE_MANAGER.read().await.get_score(complete_only).await
+pub async fn get_score_async(complete_only: bool, with_ai_details: bool) -> ScoreAPI {
+    CORE_MANAGER
+        .read()
+        .await
+        .get_score_api(complete_only, with_ai_details)
+        .await
 }
 
 // Auto-generated: handler, remote RPC wrappers, metadata registration
@@ -664,7 +669,7 @@ Security scoring, threat detection, and remediation.
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
 | `compute_score` | -- | void | Trigger score computation |
-| `get_score` | complete_only: bool | ScoreAPI | Get security score and threats |
+| `get_score` | complete_only: bool, with_ai_details: bool | ScoreAPI | Get security score and threats; optional AI governance detail |
 | `get_last_computed_secs` | -- | i64 | Seconds since last computation |
 | `get_threat_by_name` | name: String | Option\<ThreatAPI\> | Get specific threat details |
 | `check_policy` | minimum_score, threat_ids, tag_prefixes | bool | Check policy compliance |
@@ -809,6 +814,7 @@ AI-powered security automation with multiple LLM providers.
 | `oauth_signin_internal` | -- | String | OAuth sign-in to EDAMAME Portal |
 | `oauth_refresh_internal` | -- | String | Refresh OAuth tokens |
 | `oauth_signout_internal` | -- | String | Sign out |
+| `oauth_cancel_signin` | -- | String | Cancel in-flight OAuth sign-in (frees callback port) |
 | `oauth_get_status` | -- | OAuthStatusAPI | OAuth authentication status |
 | `oauth_open_signup` | -- | bool | Open sign-up page |
 | `upsert_behavioral_model` | window_json: String | String | Upsert behavioral model for two-plane correlation |

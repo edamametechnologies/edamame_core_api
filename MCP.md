@@ -235,7 +235,12 @@ Get all HIBP (HaveIBeenPwned) breach data for monitored identities. Returns brea
 
 Get the full security posture score: overall score (0-100, stars 0-5), sub-scores (network, system_integrity, services, applications, credentials), active/inactive threats with severity and remediation steps, and compliance status. Provides the quantitative baseline for before/after comparison across agent actions.
 
-**Parameters**: None
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `full` | boolean | No | Include heavy threat fields (default: false, trimmed for LLM context) |
+| `with_ai_details` | boolean | No | Include local AI governance detail bundle on `ai_details` (default: false) |
 
 ---
 

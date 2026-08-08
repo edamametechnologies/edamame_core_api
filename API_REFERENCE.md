@@ -285,12 +285,23 @@ Trigger a full security score computation. Evaluates all threat metrics for the 
 ### get_score
 
 ```
-get_score(complete_only: bool) -> ScoreAPI
+get_score(complete_only: bool, with_ai_details: bool) -> ScoreAPI
 ```
 
 Returns the current security score and all evaluated threats. When `complete_only` is true, waits for any in-progress computation to finish.
 
-`ScoreAPI` includes: overall score (0.0-5.0), list of threats with status, platform, computation timestamp.
+When `with_ai_details` is true, `ScoreAPI.ai_details` carries the local AI governance detail bundle for the `ai` domain:
+
+| Field | Meaning |
+|---|---|
+| `domain` | Always `"ai"` |
+| `mode` | Hub export consent: `"denied"` / `"enabled"` / `"forced"` |
+| `coverage[]` | Agent inventory rows (`kind`, `key`, `present`, `monitored`) |
+| `checks[]` | Per-Active-check failure causes (`check`, `causes[]`, `context[]`, `truncated`) |
+
+Consent gates Hub export, not on-device observation: the local payload is included even when `mode` is `"denied"`. When `with_ai_details` is false, `ai_details` is `null`. See `edamame_core/AIGOVERNANCE.md`.
+
+`ScoreAPI` also includes: overall score (0–100) and stars (0.0–5.0), threat lists with status, model metadata, and compliance.
 
 ### get_last_computed_secs
 
@@ -1560,6 +1571,14 @@ oauth_signout_internal() -> String
 ```
 
 Sign out and clear OAuth tokens.
+
+#### oauth_cancel_signin
+
+```
+oauth_cancel_signin() -> String
+```
+
+Cancel an in-flight OAuth sign-in and release the localhost callback port (`127.0.0.1:8765`) so a retry can bind immediately. Returns JSON with `success` and `cancelled` (`true` when an in-flight attempt was aborted).
 
 #### oauth_get_status
 
