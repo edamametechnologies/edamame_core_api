@@ -2262,7 +2262,7 @@ One-call fleet command-centre rollup: headline counts (agents discovered/paused,
 get_agent_overview(agent_type: String, window_minutes: u64) -> String
 ```
 
-Per-agent detail join: everything the per-agent drill-down card needs in one payload -- inventory/classification, observer state, run economics (session list + efficiency), OS confinement + deterministic blast-radius verdict with reasons, host privilege, detected governance harnesses, failure clusters scoped to the agent, per-instance drift summaries, and the agent's augmentation (skills) slice. Returns the JSON-serialized `AgentOverview`. Pass `0` for `window_minutes` to use the 24h default. Demo-gated through its inputs.
+Per-agent detail join: everything the per-agent drill-down card needs in one payload -- inventory footprint, observer state, run economics (session list + efficiency), OS confinement + deterministic blast-radius verdict with reasons, host privilege, detected governance harnesses, failure clusters scoped to the agent, per-instance drift summaries, and the agent's augmentation (skills) slice. Returns the JSON-serialized `AgentOverview`. Pass `0` for `window_minutes` to use the 24h default. Demo-gated through its inputs.
 
 #### get_agent_failure_clusters
 
@@ -2472,9 +2472,12 @@ Agent-visibility surface spanning MCP discovery, component inventory, capability
 recursion, flight recorder, drift timelines, and data-flow / memory / A2A maps.
 **Retired 1.7.0:** tool-call firewall (INC-10), ADR response/case export (INC-11),
 and policy pack / attestation / zone-promotion RPCs (INC-13). Prevention via
-**nono** / **srt** harnesses on blast radius. First-seen acknowledgment uses
-`acknowledge_agent` / `unacknowledge_agent` (renamed from legacy
-`approve_agent` / `revoke_agent_approval`). Requires the `agentic` feature flag.
+**nono** / **srt** harnesses on blast radius. The first-seen agent classification
+(`acknowledged` / `new` / `shadow`) and its `acknowledge_agent` /
+`unacknowledge_agent` mutators were removed too: the observer is on by default,
+so the only operator-relevant state is "discovered on disk but not observed",
+derived from the inventory row's footprint booleans and reported as the
+`unsecured_<agent>` internal threat. Requires the `agentic` feature flag.
 
 Observer-independence (I1): read RPCs may be exposed as read-only MCP tools where
 still compiled; mutators are operator/UI only. See `VISIBILITYIMPROVEMENTS.md`.
@@ -2777,34 +2780,26 @@ get_zone_promotions, request_zone_promotion, decide_zone_promotion. -->
 get_agent_inventory() -> String
 ```
 
-Return the operator agent inventory as a JSON array: every supported agent with any footprint on this host, each with `agent_type`, `display_name`, a `classification` (`acknowledged` / `shadow` / `new`), presence booleans, and per-agent endpoint/component/alertable counts. Presence flags are independent:
+Return the operator agent inventory as a JSON array: every supported agent with any footprint on this host, each with `agent_type`, `display_name`, presence booleans, and per-agent endpoint/component/alertable counts. Presence flags are independent:
 
 - `installed` -- an EDAMAME plugin is present in the agent's MCP config
 - `installed_on_host` -- the agent product itself has an on-disk footprint (config or instruction root). An agent in daily use can be installed on the host before it has ever written transcripts
 - `discovered` -- a transcript root is present on disk (the agent has been observed writing sessions)
-- `observer_enabled` / `acknowledged` -- observer toggle and first-seen acknowledgment
+- `observer_enabled` -- the host-side transcript observer is watching this agent
+
+An agent with a footprint on disk (`discovered` or `installed_on_host`) whose
+`observer_enabled` is false is running unobserved -- the same condition the
+`unsecured_<agent>` internal threat reports. There is no separate classification
+axis; the observer is enabled by default for every agent, so an unobserved agent
+is always the result of an explicit operator pause.
 
 MCP-safe read.
 
-### acknowledge_agent
-
-```
-acknowledge_agent(agent_type: String) -> String
-```
-
-Operator first-seen acknowledgment ("yes, this is me"): add an agent type to the acknowledged list, clearing its `new` / `shadow` classification. Returns `{"success": bool, "changed": bool}`; `success:false` with an `error` for an empty agent type. Operator-only mutator -- NOT an MCP tool (I1: an observed agent must not self-acknowledge).
-
-> Legacy wire name (removed): `approve_agent`.
-
-### unacknowledge_agent
-
-```
-unacknowledge_agent(agent_type: String) -> String
-```
-
-Operator: revert an agent type to an unacknowledged first-seen footprint. Returns `{"success": bool, "changed": bool}`. Operator-only mutator -- NOT an MCP tool (I1).
-
-> Legacy wire name (removed): `revoke_agent_approval`.
+> Removed in 1.7.0: the `classification` (`acknowledged` / `shadow` / `new`) and
+> `acknowledged` fields, along with the `acknowledge_agent` /
+> `unacknowledge_agent` mutators (legacy wire names `approve_agent` /
+> `revoke_agent_approval`). Derive the unobserved state from the booleans above,
+> and use `set_transcript_observer_enabled` to change it.
 
 ### get_visibility_capture_tier
 

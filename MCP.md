@@ -12,8 +12,15 @@ Complete reference for all MCP (Model Context Protocol) tools exposed by EDAMAME
 policy/attest/zone reads (`get_policy_*`, `get_zone_promotions`), and Level-2
 plugin provisioning were removed from the product. Host-side observation is
 default; prevention is via **nono** / **srt** harnesses (read via
-visibility/blast-radius tools). First-seen acknowledgment is operator-only RPC
-(`acknowledge_agent` / `unacknowledge_agent`), never MCP.
+visibility/blast-radius tools). The per-agent transcript-observer toggle
+(`set_transcript_observer_enabled`) is operator-only RPC, never MCP.
+
+The first-seen agent classification (`acknowledged` / `new` / `shadow`) and its
+`acknowledge_agent` / `unacknowledge_agent` RPCs were also removed. The observer
+is enabled by default for every agent, so the only operator-relevant state is
+"discovered on disk but not observed", derived from the inventory row's
+`discovered` / `installed_on_host` / `observer_enabled` booleans and reported as
+the `unsecured_<agent>` internal threat.
 
 ---
 
@@ -515,7 +522,7 @@ Useful for incident review and explaining "why didn't I see this finding?".
 
 Read-only structural visibility into the agents running on this host (Stage A discovery + Stage B explainability): the MCP attack surface, per-agent software bill-of-materials, the capability graph and trust-zone reachability, recursion/delegation risk, the hash-chained run flight recorder, goal/delegation drift timelines, and sensitive data-flow / memory / agent-to-agent maps. **Retired 1.7.0 from MCP and RPC:** tool-call firewall, ADR response-action catalog/history, and policy pack / evaluation / attestation / zone-promotion tools. Each tool lazily ensures a fresh snapshot before returning. All output is **metadata-only** -- it never includes secret values, credential bodies, or transcript content (only structural markers and goal hashes are derived). Requires the `agentic` feature flag.
 
-These tools share their names and behavior with the corresponding RPC methods documented in [API_REFERENCE.md](API_REFERENCE.md#agent-visibility); the MCP exposure is read-only by design (observer-independence I1). Every mutator -- `refresh_*`, `set_visibility_capture_tier`, `acknowledge_agent` / `unacknowledge_agent` -- plus the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are operator/UI control-plane only and are intentionally **not** exposed as MCP tools. An observed agent can read every structural finding about itself but cannot weaken, silence, or self-acknowledge the controls that watch it.
+These tools share their names and behavior with the corresponding RPC methods documented in [API_REFERENCE.md](API_REFERENCE.md#agent-visibility); the MCP exposure is read-only by design (observer-independence I1). Every mutator -- `refresh_*`, `set_visibility_capture_tier`, `set_transcript_observer_enabled` -- plus the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are operator/UI control-plane only and are intentionally **not** exposed as MCP tools. An observed agent can read every structural finding about itself, including its own observer state, but cannot weaken or silence the controls that watch it.
 
 ### `get_mcp_inventory`
 
@@ -549,7 +556,7 @@ READ-ONLY. Get per-agent recursion/delegation analysis derived from agent transc
 
 ### `get_agent_inventory`
 
-READ-ONLY. Operator inventory of every supported agent with any footprint on this host. Each entry has `agent_type`, `display_name`, a `classification` (`acknowledged`/`shadow`/`new`), presence booleans, and per-agent `mcp_endpoint_count`, `component_count`, `alertable_finding_count`. Presence flags are independent: `installed` (EDAMAME plugin in the agent's MCP config), `installed_on_host` (the product has an on-disk footprint -- config or instruction root -- even if it has never written transcripts), `discovered` (a transcript root is on disk), `observer_enabled`, `acknowledged`. The reasoning plane can read its own classification but cannot self-acknowledge. Metadata-only.
+READ-ONLY. Operator inventory of every supported agent with any footprint on this host. Each entry has `agent_type`, `display_name`, presence booleans, and per-agent `mcp_endpoint_count`, `component_count`, `alertable_finding_count`. Presence flags are independent: `installed` (EDAMAME plugin in the agent's MCP config), `installed_on_host` (the product has an on-disk footprint -- config or instruction root -- even if it has never written transcripts), `discovered` (a transcript root is on disk), `observer_enabled`. An agent with a footprint on disk whose `observer_enabled` is false is running unobserved (mirrored as the `unsecured_<agent>` internal threat). The reasoning plane can read its own observer state but cannot change it. Metadata-only.
 
 **Parameters**: None
 
@@ -672,7 +679,7 @@ READ-ONLY. Deterministic failed-intent clusters: agent tool errors grouped by st
 - `window_minutes` (integer, optional): Look-back window; `0` uses the 24h default.
 - `agent_type` (string, optional): Scope to one agent type; empty covers all supported agents.
 
-> **Observer-independence**: The visibility control-plane mutators (every `refresh_*`, `set_visibility_capture_tier`, `acknowledge_agent`, `unacknowledge_agent`) and the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are intentionally **not** exposed via MCP. Refresh is implicit (lazy TTL); first-seen acknowledgment and capture-tier are operator/UI surfaces. Use the EDAMAME app (Agents tab) or `edamame_cli rpc` for those.
+> **Observer-independence**: The visibility control-plane mutators (every `refresh_*`, `set_visibility_capture_tier`, `set_transcript_observer_enabled`) and the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are intentionally **not** exposed via MCP. Refresh is implicit (lazy TTL); the observer toggle and capture-tier are operator/UI surfaces. Use the EDAMAME app (Agents tab) or `edamame_cli rpc` for those.
 
 ---
 
@@ -847,7 +854,7 @@ Use a per-client credential (from pairing) or shared PSK:
 | 36 | `get_agent_component_inventories` | Visibility | Per-agent component inventory (read-only) |
 | 37 | `get_capability_graph` | Visibility | Agent capability graph edges (read-only) |
 | 38 | `get_recursion_risk` | Visibility | Recursion/delegation tree risk (read-only) |
-| 39 | `get_agent_inventory` | Visibility | Agent inventory + first-seen classification (read-only) |
+| 39 | `get_agent_inventory` | Visibility | Agent inventory footprint + counts (read-only) |
 | 40 | `get_graph_reachability` | Visibility | Per-agent trust-zone reachability (read-only) |
 | 41 | `get_effective_capabilities` | Visibility | Per-agent transitive capabilities (read-only) |
 | 42 | `list_recent_runs` | Visibility | Flight-recorder run index (read-only) |
