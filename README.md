@@ -649,7 +649,7 @@ System lifecycle, device information, and platform management.
 | `get_app_url` | -- | String | App download URL |
 | `get_app_latest_version` | -- | String | Latest available version |
 | `is_from_store` | -- | bool | Whether installed from app store |
-| `set_demo_mode` | demo_mode_on: bool | void | Toggle demo mode |
+| `set_demo_mode` | demo_mode_on: bool, report_to_backend: Option&lt;bool&gt; | void | Toggle demo mode (`report_to_backend` defaults to false) |
 | `set_demo_platform` | platform: String | void | Override platform for demo |
 | `clear_demo_platform` | -- | void | Clear platform override |
 | `get_demo_platform` | -- | String | Current demo platform |

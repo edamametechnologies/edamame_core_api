@@ -173,10 +173,17 @@ Returns whether the application was installed from an app store (macOS App Store
 ### set_demo_mode
 
 ```
-set_demo_mode(demo_mode_on: bool) -> ()
+set_demo_mode(demo_mode_on: bool, report_to_backend: Option<bool>) -> ()
 ```
 
 Toggle demo mode. When enabled, uses simulated data for demonstrations.
+
+`report_to_backend` is optional and defaults to `false`, in which case the
+synthetic demo score stays local and the device stops reporting to the Hub for
+as long as demo mode is on. Set it to `true` to keep reporting the demo score
+under the real identity, so the device stays live in the fleet while local
+surfaces show demo data. It is only meaningful together with
+`demo_mode_on: true`.
 
 ### set_demo_platform
 
@@ -2137,7 +2144,7 @@ get_agent_plugin_health, uninstall_agent_plugin -->
 
 ### External Transcript Observer
 
-Per-agent host-side observer that reads each discovered agent's transcripts from disk and feeds the existing `upsert_behavioral_model_from_raw_sessions` pipeline (see `AGENTIC.md`). Discovery is independent of plugin install state, so divergence detection works end-to-end without an in-agent bridge. Pausing the observer for a discovered agent trips the corresponding `unsecured_<agent>` internal threat.
+Per-agent host-side observer that reads each discovered agent's transcripts from disk and feeds the existing `upsert_behavioral_model_from_raw_sessions` pipeline (see `AGENTIC.md`). Discovery (`discovered`: transcript root on disk) is independent of both plugin install (`installed`) and product presence (`installed_on_host`: config or instruction root on disk). An agent can be installed on the host before it has ever written transcripts; the inventory lists that as installed, not yet observed. Pausing the observer for a discovered agent trips the corresponding `unsecured_<agent>` internal threat. An installed-but-never-run agent is not unsecured.
 
 #### get_transcript_observer_status
 
@@ -2770,7 +2777,14 @@ get_zone_promotions, request_zone_promotion, decide_zone_promotion. -->
 get_agent_inventory() -> String
 ```
 
-Return the operator agent inventory as a JSON array: every supported agent with any footprint on this host, each with `agent_type`, `display_name`, a `classification` (`acknowledged` / `shadow` / `new`), the installed/discovered/observer_enabled/acknowledged booleans, and per-agent endpoint/component/alertable counts. MCP-safe read.
+Return the operator agent inventory as a JSON array: every supported agent with any footprint on this host, each with `agent_type`, `display_name`, a `classification` (`acknowledged` / `shadow` / `new`), presence booleans, and per-agent endpoint/component/alertable counts. Presence flags are independent:
+
+- `installed` -- an EDAMAME plugin is present in the agent's MCP config
+- `installed_on_host` -- the agent product itself has an on-disk footprint (config or instruction root). An agent in daily use can be installed on the host before it has ever written transcripts
+- `discovered` -- a transcript root is present on disk (the agent has been observed writing sessions)
+- `observer_enabled` / `acknowledged` -- observer toggle and first-seen acknowledgment
+
+MCP-safe read.
 
 ### acknowledge_agent
 

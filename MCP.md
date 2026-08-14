@@ -549,7 +549,7 @@ READ-ONLY. Get per-agent recursion/delegation analysis derived from agent transc
 
 ### `get_agent_inventory`
 
-READ-ONLY. Operator inventory of every supported agent with any footprint on this host. Each entry has `agent_type`, `display_name`, a `classification` (`acknowledged`/`shadow`/`new`), the installed/discovered/observer_enabled/acknowledged booleans, and per-agent `mcp_endpoint_count`, `component_count`, `alertable_finding_count`. The reasoning plane can read its own classification but cannot self-acknowledge. Metadata-only.
+READ-ONLY. Operator inventory of every supported agent with any footprint on this host. Each entry has `agent_type`, `display_name`, a `classification` (`acknowledged`/`shadow`/`new`), presence booleans, and per-agent `mcp_endpoint_count`, `component_count`, `alertable_finding_count`. Presence flags are independent: `installed` (EDAMAME plugin in the agent's MCP config), `installed_on_host` (the product has an on-disk footprint -- config or instruction root -- even if it has never written transcripts), `discovered` (a transcript root is on disk), `observer_enabled`, `acknowledged`. The reasoning plane can read its own classification but cannot self-acknowledge. Metadata-only.
 
 **Parameters**: None
 
