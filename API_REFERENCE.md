@@ -1185,6 +1185,22 @@ check_policies_for_current_domain() -> Vec<PoliciesStatusAPI>
 
 Check all policies for the currently connected domain.
 
+### get_ai_whitelist_status
+
+```
+get_ai_whitelist_status() -> AiWhitelistStatusAPI
+```
+
+Returns the last AI whitelist answer the Hub gave for this device: whether the
+observed agent activity fits the admin-defined whitelists, which selectors were
+never allowed (`violations`), and the per-whitelist breakdown (`whitelists`).
+
+This is a cached read, refreshed on the report cycle alongside policies -- it
+never performs a network round trip, so it is safe to call on every UI rebuild.
+When the Hub has not answered yet, `answered` is `false`, `verdict` is
+`Unknown`, and every other field is meaningless. Verdict values are `Unknown`,
+`NotCovered`, `Inconclusive`, `Fits`, and `DoesNotFit`.
+
 ### user_feedback
 
 ```
