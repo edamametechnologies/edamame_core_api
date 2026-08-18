@@ -2480,6 +2480,14 @@ get_export_ai_failure_details() -> bool
 
 Read the persisted AI failure-detail export preference. Mirror of the `export_ai_failure_details` field in `get_privacy_preferences`. Does not reflect posture force — use the `mode` field (`denied` | `enabled` | `forced`) of the `ai` bundle in the Hub wire field `details` for the effective mode.
 
+### get_consent_document
+
+```
+get_consent_document(document: String, locale: String) -> String
+```
+
+Return operator-facing consent markdown. Tries `raw.githubusercontent.com/edamametechnologies/threatmodels/{branch}/consent/` first, then the snapshot embedded by `edamame_foundation/update-threats.sh`. `document` is one of `compliance-scanner`, `user-feedback`, `profiling-feedback`, `request-report`, `vulnerability-feedback`, `privacy-LLM`, `privacy-detailed`, `privacy-detailed-ai`. `locale` is `EN` or `FR` (anything else falls back to English). Unknown ids return an empty string.
+
 ---
 
 ## Agent Visibility
