@@ -33,7 +33,7 @@ EDAMAME implements a two-plane runtime monitoring architecture:
 
 For this architecture to be meaningful, the **observed** (the LLM agent) must not be able to silence findings about its **own** behavior. Otherwise an attacker who has compromised the agent could trivially dismiss the very findings that would catch them.
 
-The MCP tool surface therefore enforces a strict read-only contract for security findings and dismissal state:
+The MCP tool surface therefore keeps observer state and operator control actions outside the reasoning plane:
 
 | Concern | MCP exposure | Operator surface |
 |---|---|---|
@@ -41,6 +41,10 @@ The MCP tool surface therefore enforces a strict read-only contract for security
 | Read vulnerability findings / history / detector status | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read active dismissal rules + audit log | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read agent visibility (MCP inventory, component inventory, capability graph + reachability, recursion, flight recorder, drift timelines, data-flow / memory / A2A maps, response catalog/history, policy pack/evaluation/attestations, zone promotions, agent inventory, blast radius / harnesses) | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Add an identity to breach monitoring | YES (strengthens future observation) | EDAMAME app, edamame_cli RPC |
+| Remove an identity from breach monitoring | **NO** | `remove_pwned_email` RPC |
+| Change LAN auto-scan configuration | **NO** | `set_auto_scan` RPC |
+| Undo one or all advisor actions | **NO** | `agentic_undo_action` / `agentic_undo_all_actions` RPC |
 | Refresh any visibility domain / set capture tier | **NO** | EDAMAME app (Agents tab), edamame_cli RPC |
 | Approve / revoke an agent | **NO** | EDAMAME app (Agents tab), edamame_cli RPC |
 | Tool-call firewall (retired 1.7.0) | **NO** | N/A |
@@ -59,7 +63,7 @@ The MCP tool surface therefore enforces a strict read-only contract for security
 | Reset vulnerability suppressions | **NO** | edamame_cli RPC, integration tests only |
 | Clear dismissal audit log | **NO** | EDAMAME app, edamame_cli RPC |
 
-The corresponding **RPC** endpoints (`agentic_dismiss_with_scope`, `dismiss_vulnerability_finding`, `clear_divergence_state`, ...) remain available -- only their MCP tool exposure has been removed. RPC is the operator-facing control plane (EDAMAME app, `edamame_cli`); MCP is the LLM-facing observation plane.
+The corresponding **RPC** endpoints (`agentic_undo_action`, `agentic_undo_all_actions`, `remove_pwned_email`, `set_auto_scan`, `agentic_dismiss_with_scope`, `dismiss_vulnerability_finding`, `clear_divergence_state`, ...) remain available. RPC is the operator-facing control plane (EDAMAME app, `edamame_cli`); MCP is the LLM-facing plane for observation, intent intake, and bounded advisor workflows.
 
 CI integration tests that need to clear vulnerability/divergence state between scenarios call the RPC layer directly (`edamame_cli rpc clear_vulnerability_history`, `edamame_cli rpc clear_divergence_state`, etc.) -- these never went through the MCP tool path.
 
@@ -123,13 +127,14 @@ Poll pairing status. Returns JSON with `status` and optional `credential`:
 4. [Advisor Tools](#advisor-tools)
 5. [Observation Tools -- System Plane Telemetry](#observation-tools----system-plane-telemetry)
 6. [Identity / HIBP Management Tools](#identity--hibp-management-tools)
-7. [LAN Scan Configuration Tools](#lan-scan-configuration-tools)
-8. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
-9. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
-10. [Attack Pattern Detection Tools](#attack-pattern-detection-tools)
-11. [Recurrence-Aware Dismissal Rules (read-only)](#recurrence-aware-dismissal-rules-read-only)
-12. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
-13. [Server Management](#server-management)
+7. [Agentic Tools -- Automated Workflow](#agentic-tools----automated-workflow)
+8. [Divergence Tools -- Two-Plane Behavioral Correlation](#divergence-tools----two-plane-behavioral-correlation)
+9. [Attack Pattern Detection Tools](#attack-pattern-detection-tools)
+10. [Recurrence-Aware Dismissal Rules (read-only)](#recurrence-aware-dismissal-rules-read-only)
+11. [File Integrity Monitoring Tools](#file-integrity-monitoring-tools)
+12. [Agent Visibility Tools](#agent-visibility-tools)
+13. [L7 Session Enrichment Fields](#l7-session-enrichment-fields)
+14. [Server Management](#server-management)
 
 ---
 
@@ -153,25 +158,8 @@ Get history of AI agent actions (last 30 days) including what was executed, the 
 |------|------|---------|-------------|
 | `limit` | integer | 50 | Maximum number of actions to return |
 
----
-
-### `advisor_undo_action`
-
-Undo a specific AI action by its ID (rollback threat remediation, un-dismiss ports/sessions/breaches). Reverses the automated action and restores previous state. Get action IDs from `advisor_get_action_history`.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `action_id` | string | Yes | ID of the action to undo |
-
----
-
-### `advisor_undo_all_actions`
-
-Undo ALL AI actions from current session (last 30 days). Rolls back all threat remediations, un-dismisses all ports/sessions/breaches. Returns count of successful/failed rollbacks.
-
-**Parameters**: None
+> Undo is operator-only. Use `agentic_undo_action` or
+> `agentic_undo_all_actions` through the EDAMAME app or `edamame_cli rpc`.
 
 ---
 
@@ -277,39 +265,15 @@ Add an email address to HIBP (HaveIBeenPwned) breach monitoring. The email will 
 
 ---
 
-### `remove_pwned_email`
-
-Remove an email address from HIBP breach monitoring.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `email` | string | Yes | Email address to remove from breach monitoring |
-
-**Returns**: Same shape and `outcome` vocabulary as `add_pwned_email`, with `changed` meaning the address was monitored and now is not, and `unchanged` meaning it was already absent. `tracked` is `false` on success and `null` otherwise -- notably, a `demo_mode_no_op` refusal leaves the address monitored, so reporting `false` would be wrong.
-
----
-
 ### `get_pwned_emails`
 
 Get the list of all emails currently monitored for HIBP breaches, with per-email summary: which are auto-detected vs manually added, breach counts per email, and overall pwned status. Use this to check what identities are being watched before adding new ones.
 
 **Parameters**: None
 
----
-
-## LAN Scan Configuration Tools
-
-### `set_lan_auto_scan`
-
-Enable or disable continuous LAN auto-scanning. When enabled, EDAMAME periodically scans the local network for devices, open ports, and CVEs -- feeding discovered infrastructure into the security context (`advisor_get_todos`) and enabling lateral-movement detection. Should be enabled for comprehensive security monitoring.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `enabled` | boolean | Yes | Enable or disable auto-scanning |
+> Removing an identity weakens future observation and is operator-only through
+> the `remove_pwned_email` RPC. LAN auto-scan configuration is likewise
+> operator-only through the `set_auto_scan` RPC.
 
 ---
 
@@ -317,7 +281,7 @@ Enable or disable continuous LAN auto-scanning. When enabled, EDAMAME periodical
 
 ### `agentic_process_todos`
 
-Process all security todos with AI-powered intelligent triage. LLM analyzes each todo (threats, network issues, breaches) and makes binary decision: `auto_resolve` (safe to fix) or `escalate` (needs review with priority level). Confirmation level: `auto` executes safe items immediately, `manual` records all as pending for user confirmation. Returns categorized results: auto_resolved, requires_confirmation, escalated (with priority), failed. All actions are reversible via undo.
+Process all security todos with AI-powered intelligent triage. LLM analyzes each todo (threats, network issues, breaches) and makes binary decision: `auto_resolve` (safe to fix) or `escalate` (needs review with priority level). Confirmation level: `auto` executes safe items immediately, `manual` records all as pending for user confirmation. Returns categorized results: auto_resolved, requires_confirmation, escalated (with priority), failed. Executed actions remain reversible by an operator through the `agentic_undo_action` and `agentic_undo_all_actions` RPCs; undo is not exposed through MCP.
 
 **Parameters**:
 
@@ -445,7 +409,7 @@ Model-independent heuristic checks (CVE-aligned). Run on their own cadence, inde
 
 ### `get_vulnerability_findings`
 
-Get the latest vulnerability findings from model-independent heuristic checks. Returns timestamped report with `findings` array; each finding has `check`, `severity` (CRITICAL/HIGH/MEDIUM), `description`, `reference` (CVE IDs or incident ref), `process_name`, `parent_process_name`, `destination_ip`, `open_files`, and `finding_key`.
+Get the latest vulnerability findings from model-independent heuristic checks. Returns timestamped report with `findings` array; each finding has `check`, `severity` (CRITICAL/HIGH/MEDIUM), `description`, `reference` (CVE IDs or incident ref), `process_name`, `parent_process_name`, `destination_ip`, `open_files`, `finding_key`, `dismissed`, and -- when a dismissal rule currently covers the finding -- `dismissed_by_rule` (the rule id; absent on non-dismissed findings and on Finding-scope sticky dismissals with no matching rule).
 
 **Parameters**: None
 
@@ -515,6 +479,33 @@ Useful for incident review and explaining "why didn't I see this finding?".
 | `limit` | integer | 50 | Maximum number of entries to return; `0` returns all entries |
 
 > **Observer-independence**: The corresponding mutation tools (`dismiss_vulnerability_finding_with_scope`, `dismiss_divergence_evidence_with_scope`, `remove_agentic_dismissal_rule`, `set_agentic_dismissal_rule_severity_ceiling`, `reset_agentic_dismissal_rules`, `clear_agentic_dismissal_audit_log`) are intentionally **not** exposed via MCP. Operators mutate dismissal state via the EDAMAME app or `edamame_cli rpc`.
+
+---
+
+## File Integrity Monitoring Tools
+
+### `get_file_events`
+
+READ-ONLY. Get tracked file create, modify, delete, and rename events with
+paths, BLAKE3 hashes, sensitivity classification, and labels. The response also
+includes sensitive events and a suspicious-event indicator.
+
+**Parameters**: None
+
+### `get_file_monitor_status`
+
+READ-ONLY. Get whether file monitoring is active, watched paths, total event
+count, and the last event timestamp.
+
+**Parameters**: None
+
+### `get_file_event_summary`
+
+READ-ONLY. Get file-event counts grouped by event type and sensitivity label,
+including sensitive/non-sensitive totals, watched paths, monitoring state, and
+the suspicious-event indicator.
+
+**Parameters**: None
 
 ---
 
@@ -588,6 +579,28 @@ READ-ONLY. Get the full flight record for one run: the ordered, replayable, hash
 |------|------|----------|-------------|
 | `run_id` | string | Yes | Run id from `list_recent_runs` |
 
+### `list_structural_runs`
+
+READ-ONLY. List LLM-free structural reasoning runs built only from raw
+transcript session lifecycle events. Each run includes its ID, title,
+timestamps, event and edge counts, and hash-chain validity. This surface does
+not carry divergence severity; use `list_recent_runs` for the
+divergence-correlated recorder.
+
+**Parameters**: None
+
+### `get_structural_run_provenance`
+
+READ-ONLY. Get one LLM-free structural flight record: ordered, hash-chained
+reasoning-plane events and causal edges, without divergence verdicts or
+evidence. Returns `{}` when the run is unknown.
+
+**Parameters**:
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `run_id` | string | Yes | Run id from `list_structural_runs` |
+
 ### `explain_run_event`
 
 READ-ONLY. Prove why a single recorded event happened: returns the causal backtrace (chronological ancestor chain walked transitively into the target), the downstream descendants, the edges traversed, `backtrace_complete`, and `chain_valid`. This is the recorder's prove-why for any divergence evidence or declared action. Metadata-only.
@@ -645,6 +658,33 @@ READ-ONLY. One agent's data-flow map. Returns `{}` when no map exists for that a
 ### `get_memory_inventory`
 
 READ-ONLY. The memory/RAG inventory: discovered persistent context stores (vector DBs, memory files, RAG corpora) each agent can read/write, with scope and a poisoning-risk severity. Metadata-only.
+
+**Parameters**: None
+
+### `get_a2a_graph`
+
+READ-ONLY. Get the agent-to-agent surface map: discovered A2A peers,
+framework backends, exposure and authentication metadata, plus confused-deputy
+cross-zone edges. Includes alertable peer/edge counts. Message bodies are never
+returned.
+
+**Parameters**: None
+
+### `get_owasp_scorecard`
+
+READ-ONLY. Get the live OWASP GenAI crosswalk for the Agentic ASI01-ASI10 and
+LLM LLM01-LLM10 taxonomies. Each row combines the static coverage grade with
+attributed live findings, worst severity, alertable counts, and canonical OWASP
+references. This is a projection of existing findings, not a new alert source.
+
+**Parameters**: None
+
+### `get_agent_subprocess_usage`
+
+READ-ONLY. Get critical subprocess usage attributed to supported agents from
+captured L7 process lineage. Observations classify remote-access, raw-network,
+HTTP, shell, interpreter, VCS, package-manager, and container tooling and
+include per-agent rollups. Findings are capped at MEDIUM severity.
 
 **Parameters**: None
 
@@ -818,53 +858,54 @@ Use a per-client credential (from pairing) or shared PSK:
 |---|------|----------|-------------|
 | 1 | `advisor_get_todos` | Advisor | Security todos list |
 | 2 | `advisor_get_action_history` | Advisor | AI action audit trail |
-| 3 | `advisor_undo_action` | Advisor | Rollback specific action |
-| 4 | `advisor_undo_all_actions` | Advisor | Rollback all actions |
-| 5 | `get_sessions` | Observation | All sessions with L7 enrichment |
-| 6 | `get_anomalous_sessions` | Observation | ML-flagged anomalous sessions |
-| 7 | `get_blacklisted_sessions` | Observation | Sessions to known-bad destinations |
-| 8 | `get_exceptions` | Observation | Whitelist/policy violations |
-| 9 | `get_lan_devices` | Observation | LAN device inventory |
-| 10 | `get_lan_host_device` | Observation | This host's LAN identity |
-| 11 | `get_breaches` | Observation | HIBP breach data |
-| 12 | `get_score` | Observation | Full posture score |
-| 13 | `add_pwned_email` | Identity | Add email to breach monitoring |
-| 14 | `remove_pwned_email` | Identity | Remove email from monitoring |
-| 15 | `get_pwned_emails` | Identity | List monitored emails |
-| 16 | `set_lan_auto_scan` | LAN Config | Toggle continuous scanning |
-| 17 | `agentic_process_todos` | Agentic | AI-powered todo processing |
-| 18 | `agentic_execute_action` | Agentic | Execute pending action |
-| 19 | `agentic_get_workflow_status` | Agentic | Workflow progress |
-| 20 | `upsert_behavioral_model` | Divergence | Push reasoning-plane behavioral model |
-| 21 | `upsert_behavioral_model_from_raw_sessions` | Divergence | Build + push model directly from raw session JSON |
-| 22 | `get_behavioral_model` | Divergence | Read stored behavioral model |
-| 23 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
-| 24 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
-| 25 | `get_divergence_engine_status` | Divergence | Divergence engine status |
-| 26 | `get_vulnerability_findings` | Vulnerability | Active findings (read-only) |
-| 27 | `get_vulnerability_detector_status` | Vulnerability | Detector running state and counts |
-| 28 | `get_vulnerability_history` | Vulnerability | Rolling history of detector reports |
-| 29 | `list_agentic_dismissal_rules` | Dismissal Rules | Read-only list of recurrence-aware dismissal rules |
-| 30 | `list_agentic_dismissal_audit_log` | Dismissal Rules | Read-only dismissal audit log |
-| 31 | `get_file_events` | FIM | Recent FIM events snapshot |
-| 32 | `get_file_monitor_status` | FIM | FIM watcher running state and roots |
-| 33 | `get_file_event_summary` | FIM | Aggregated FIM event summary |
-| 34 | `get_mcp_inventory` | Visibility | Discovered MCP attack surface (read-only) |
-| 35 | `get_mcp_findings` | Visibility | Deterministic MCP risk findings (read-only) |
-| 36 | `get_agent_component_inventories` | Visibility | Per-agent component inventory (read-only) |
-| 37 | `get_capability_graph` | Visibility | Agent capability graph edges (read-only) |
-| 38 | `get_recursion_risk` | Visibility | Recursion/delegation tree risk (read-only) |
-| 39 | `get_agent_inventory` | Visibility | Agent inventory footprint + counts (read-only) |
-| 40 | `get_graph_reachability` | Visibility | Per-agent trust-zone reachability (read-only) |
-| 41 | `get_effective_capabilities` | Visibility | Per-agent transitive capabilities (read-only) |
-| 42 | `list_recent_runs` | Visibility | Flight-recorder run index (read-only) |
-| 43 | `get_run_provenance` | Visibility | Full hash-chained run flight record (read-only) |
-| 44 | `explain_run_event` | Visibility | Causal backtrace for one run event (read-only) |
-| 45 | `get_agent_drift` | Visibility | Per-agent goal/delegation drift timelines (read-only) |
-| 46 | `get_agent_drift_timeline` | Visibility | One agent's full drift timeline (read-only) |
-| 47 | `explain_agent_drift` | Visibility | Prove-why for one drift event (read-only) |
-| 48 | `get_dataflow_maps` | Visibility | Per-agent source->sink data-flow maps (read-only) |
-| 49 | `get_dataflow_map` | Visibility | One agent's data-flow map (read-only) |
-| 50 | `get_memory_inventory` | Visibility | Agent memory/RAG store inventory (read-only) |
-| 51 | `get_agent_fleet_overview` | Fleet | Fleet command-centre rollup (read-only) |
-| 52 | `get_agent_failure_clusters` | Fleet | Deterministic failed-intent clusters (read-only) |
+| 3 | `get_sessions` | Observation | All sessions with L7 enrichment |
+| 4 | `get_anomalous_sessions` | Observation | ML-flagged anomalous sessions |
+| 5 | `get_blacklisted_sessions` | Observation | Sessions to known-bad destinations |
+| 6 | `get_exceptions` | Observation | Whitelist/policy violations |
+| 7 | `get_lan_devices` | Observation | LAN device inventory |
+| 8 | `get_lan_host_device` | Observation | This host's LAN identity |
+| 9 | `get_breaches` | Observation | HIBP breach data |
+| 10 | `get_score` | Observation | Full posture score |
+| 11 | `add_pwned_email` | Identity | Add email to breach monitoring |
+| 12 | `get_pwned_emails` | Identity | List monitored emails |
+| 13 | `agentic_process_todos` | Agentic | AI-powered todo processing |
+| 14 | `agentic_execute_action` | Agentic | Execute pending action |
+| 15 | `agentic_get_workflow_status` | Agentic | Workflow progress |
+| 16 | `upsert_behavioral_model` | Divergence | Push reasoning-plane behavioral model |
+| 17 | `upsert_behavioral_model_from_raw_sessions` | Divergence | Build + push model directly from raw session JSON |
+| 18 | `get_behavioral_model` | Divergence | Read stored behavioral model |
+| 19 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
+| 20 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
+| 21 | `get_divergence_engine_status` | Divergence | Divergence engine status |
+| 22 | `get_vulnerability_findings` | Attack Pattern | Active findings (read-only) |
+| 23 | `get_vulnerability_detector_status` | Attack Pattern | Detector running state and counts |
+| 24 | `get_vulnerability_history` | Attack Pattern | Rolling detector report history |
+| 25 | `list_agentic_dismissal_rules` | Dismissal Rules | Recurrence-aware dismissal rules (read-only) |
+| 26 | `list_agentic_dismissal_audit_log` | Dismissal Rules | Dismissal audit log (read-only) |
+| 27 | `get_file_events` | FIM | Recent FIM events snapshot |
+| 28 | `get_file_monitor_status` | FIM | FIM watcher running state and roots |
+| 29 | `get_file_event_summary` | FIM | Aggregated FIM event summary |
+| 30 | `get_mcp_inventory` | Visibility | Discovered MCP attack surface (read-only) |
+| 31 | `get_mcp_findings` | Visibility | Deterministic MCP risk findings (read-only) |
+| 32 | `get_agent_component_inventories` | Visibility | Per-agent component inventory (read-only) |
+| 33 | `get_capability_graph` | Visibility | Agent capability graph edges (read-only) |
+| 34 | `get_recursion_risk` | Visibility | Recursion/delegation tree risk (read-only) |
+| 35 | `get_agent_inventory` | Visibility | Agent inventory footprint + counts (read-only) |
+| 36 | `get_graph_reachability` | Visibility | Per-agent trust-zone reachability (read-only) |
+| 37 | `get_effective_capabilities` | Visibility | Per-agent transitive capabilities (read-only) |
+| 38 | `list_recent_runs` | Visibility | Divergence-correlated flight-recorder index (read-only) |
+| 39 | `get_run_provenance` | Visibility | Full divergence-correlated flight record (read-only) |
+| 40 | `explain_run_event` | Visibility | Causal backtrace for one run event (read-only) |
+| 41 | `list_structural_runs` | Visibility | LLM-free structural run index (read-only) |
+| 42 | `get_structural_run_provenance` | Visibility | LLM-free structural flight record (read-only) |
+| 43 | `get_agent_drift` | Visibility | Per-agent goal/delegation drift timelines (read-only) |
+| 44 | `get_agent_drift_timeline` | Visibility | One agent's full drift timeline (read-only) |
+| 45 | `explain_agent_drift` | Visibility | Prove-why for one drift event (read-only) |
+| 46 | `get_dataflow_maps` | Visibility | Per-agent source-to-sink data-flow maps (read-only) |
+| 47 | `get_dataflow_map` | Visibility | One agent's data-flow map (read-only) |
+| 48 | `get_memory_inventory` | Visibility | Agent memory/RAG store inventory (read-only) |
+| 49 | `get_a2a_graph` | Visibility | Agent-to-agent surface map (read-only) |
+| 50 | `get_owasp_scorecard` | Visibility | OWASP GenAI live-evidence scorecard (read-only) |
+| 51 | `get_agent_subprocess_usage` | Visibility | Agent critical-subprocess usage (read-only) |
+| 52 | `get_agent_fleet_overview` | Fleet | Fleet command-centre rollup (read-only) |
+| 53 | `get_agent_failure_clusters` | Fleet | Deterministic failed-intent clusters (read-only) |

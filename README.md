@@ -477,61 +477,27 @@ edamame_posture background-mcp-generate-psk
 
 For the EDAMAME Security desktop app, configure credentials under AI tab > MCP Server Settings (pairing UI or shared PSK).
 
-### MCP Tools Exposed (33 tools)
+### MCP Tools
 
-See [MCP.md](MCP.md) for the complete MCP tools reference with parameters, return types, and L7 session field documentation.
+See [MCP.md](MCP.md) for the authoritative tool list, parameters, return
+shapes, and L7 session field documentation. The MCP surface covers:
 
-| # | Tool | Category | Description |
-|---|------|----------|-------------|
-| 1 | `advisor_get_todos` | Advisor | Security todos list |
-| 2 | `advisor_get_action_history` | Advisor | AI action audit trail |
-| 3 | `advisor_undo_action` | Advisor | Rollback specific action |
-| 4 | `advisor_undo_all_actions` | Advisor | Rollback all actions |
-| 5 | `get_sessions` | Observation | All sessions with L7 enrichment (`active_only`, `limit`) |
-| 6 | `get_anomalous_sessions` | Observation | ML-flagged anomalous sessions |
-| 7 | `get_blacklisted_sessions` | Observation | Sessions to known-bad destinations |
-| 8 | `get_exceptions` | Observation | Whitelist/policy violations |
-| 9 | `get_lan_devices` | Observation | LAN device inventory |
-| 10 | `get_lan_host_device` | Observation | This host's LAN identity |
-| 11 | `get_breaches` | Observation | HIBP breach data |
-| 12 | `get_score` | Observation | Full posture score |
-| 13 | `add_pwned_email` | Identity | Add email to breach monitoring |
-| 14 | `remove_pwned_email` | Identity | Remove email from monitoring |
-| 15 | `get_pwned_emails` | Identity | List monitored emails |
-| 16 | `set_lan_auto_scan` | LAN Config | Toggle continuous scanning |
-| 17 | `agentic_process_todos` | Agentic | AI-powered todo processing |
-| 18 | `agentic_execute_action` | Agentic | Execute pending action |
-| 19 | `agentic_get_workflow_status` | Agentic | Workflow progress |
-| 20 | `upsert_behavioral_model` | Divergence | Push reasoning-plane behavioral model |
-| 21 | `upsert_behavioral_model_from_raw_sessions` | Divergence | Push raw sessions, EDAMAME LLM generates model |
-| 22 | `get_behavioral_model` | Divergence | Read stored behavioral model |
-| 23 | `get_divergence_verdict` | Divergence | Get latest divergence verdict (read-only) |
-| 24 | `get_divergence_history` | Divergence | Rolling divergence verdict history (read-only) |
-| 25 | `get_divergence_engine_status` | Divergence | Divergence engine status (read-only) |
-| 26 | `get_vulnerability_findings` | Vulnerability | CVE-aligned heuristic findings (read-only) |
-| 27 | `get_vulnerability_detector_status` | Vulnerability | Detector runtime status (read-only) |
-| 28 | `get_vulnerability_history` | Vulnerability | Rolling history of attack pattern detector reports (read-only) |
-| 29 | `list_agentic_dismissal_rules` | Dismissal | Read-only: active recurrence-aware dismissal rules with telemetry |
-| 30 | `list_agentic_dismissal_audit_log` | Dismissal | Read-only: audit log of dismissal-rule lifecycle events |
-| 31 | `get_file_events` | FIM | Recent FIM events snapshot |
-| 32 | `get_file_monitor_status` | FIM | FIM watcher running state and roots |
-| 33 | `get_file_event_summary` | FIM | Aggregated FIM event summary |
+- posture, advisor todos, and action-history reads;
+- network, LAN, breach, and file-integrity telemetry;
+- bounded advisor workflow execution;
+- behavioral-model intake and read-only divergence/attack-pattern results;
+- recurrence-aware dismissal-rule and audit-log reads;
+- agent inventory, capability, provenance, drift, data-flow, memory, A2A,
+  OWASP, subprocess, fleet, and failure-cluster visibility.
 
-> **Observer-independence policy** (CRITICAL): The reasoning plane (LLM agent) must not be
-> able to silence security findings about its own behavior. Therefore, the MCP surface for
-> divergence and vulnerability findings is **read-only**. Dismissal mutation operations
-> (`dismiss_*`, `undismiss_*`, `dismiss_*_with_scope`, `clear_divergence_state`,
-> `clear_vulnerability_history`, `reset_vulnerability_suppressions`,
-> `remove_agentic_dismissal_rule`, `set_agentic_dismissal_rule_severity_ceiling`,
-> `reset_agentic_dismissal_rules`, `clear_agentic_dismissal_audit_log`) are
-> **operator-only** via the EDAMAME app UI (AI tab > Dismissal rules) and the
-> `edamame_cli` RPC surface. The corresponding RPC endpoints remain available -- only
-> their MCP tool exposure is removed.
->
-> Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`,
-> `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are
-> direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP
-> tools either.
+> **Observer-independence policy**: The reasoning plane cannot weaken the
+> observer or reverse operator decisions. Removing a monitored identity,
+> changing LAN auto-scan, and undoing one or all advisor actions are available
+> only through the operator RPCs `remove_pwned_email`, `set_auto_scan`,
+> `agentic_undo_action`, and `agentic_undo_all_actions`. Dismissal mutation,
+> state clearing, suppression reset, lifecycle, visibility refresh, capture
+> tier, and transcript-observer controls are likewise operator-only through the
+> EDAMAME app or `edamame_cli rpc`.
 
 Behavioral-model payloads use the v3 schema:
 - expected dimensions: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_grandparent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
@@ -729,7 +695,11 @@ Key fields: `pid`, `process_name`, `process_path`, `cmd`, `cwd`, `parent_pid`, `
 
 ### Breach Detection / Pwned (8 methods)
 
-Email breach monitoring via HaveIBeenPwned integration. Supports dynamic add/remove of monitored emails via `add_pwned_email` and `remove_pwned_email`, enabling runtime identity registration (e.g., from an AI agent's introspection loop). Also available as MCP tools (see [MCP.md](MCP.md#identity--hibp-management-tools)).
+Email breach monitoring via HaveIBeenPwned integration. RPC supports dynamic
+addition and removal through `add_pwned_email` and `remove_pwned_email`. MCP
+allows agents to add and inspect monitored identities, but removal weakens future
+observation and is therefore operator-only through the `remove_pwned_email` RPC.
+See [MCP.md](MCP.md#identity--hibp-management-tools).
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|

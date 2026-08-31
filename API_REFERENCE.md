@@ -20,6 +20,7 @@ Methods are organized by API domain. Health-related methods are omitted from thi
 - [Advisor](#advisor)
 - [Agentic / AI Automation](#agentic--ai-automation)
 - [Metrics History](#metrics-history)
+- [Health](#health)
 - [File Integrity Monitoring (FIM)](#file-integrity-monitoring-fim)
 - [Privacy](#privacy)
 - [Agent Visibility](#agent-visibility)
@@ -2357,6 +2358,30 @@ clear_metrics_history() -> ()
 ```
 
 Clear the durable metrics-history TSDB (the Agents tab "clear history" control). Infallible mutator: a persist failure is logged core-side rather than surfaced. Triggers `AgentMetricsUpdated` so the Flutter tabs refresh at once. Operator-only, never MCP.
+
+---
+
+## Health
+
+Personal health scoring plane (physical activity, rest and recovery, physiological stress indicators, health habits). Data points are pushed by the platform health integrations (HealthKit / Health Connect) through the Flutter bridge; the core folds them into a `HealthAPI` score projection. Requires the `health` feature flag.
+
+**Source**: `api/api_health.rs`.
+
+### get_health
+
+```
+get_health(compute_requested: bool) -> HealthAPI
+```
+
+Return the current health score projection: per-pillar scores (`physical_activity`, `rest_and_recovery`, `physio_stress_indicators`, `health_habits`), the `overall` score and `stars` rating, plus compute progress metadata (`compute_in_progress`, `compute_progress_percent`, `last_completed_metric`, `last_compute`). When `compute_requested` is `true`, a recompute is requested before the projection is returned; `false` reads the cached state.
+
+### add_point
+
+```
+add_point(json: String) -> ()
+```
+
+Ingest one health data point. `json` is a serialized `HealthDataPoint` (`data_type`, `value`, `unit`, `date_from`, `date_to`, `platform_type`, `device_id`, `source_id`, `source_name`). Infallible mutator: a malformed payload is logged and dropped core-side rather than surfaced to the caller.
 
 ---
 
