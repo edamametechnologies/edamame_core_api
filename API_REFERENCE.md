@@ -305,7 +305,7 @@ When `with_ai_details` is true, `ScoreAPI.ai_details` carries the local AI gover
 | `domain` | Always `"ai"` |
 | `mode` | Hub export consent: `"denied"` / `"enabled"` / `"forced"` |
 | `coverage[]` | Agent inventory rows (`kind`, `key`, `present`, `monitored`) |
-| `checks[]` | Per-Active-check failure causes (`check`, `causes[]`, `context[]`, `truncated`) |
+| `checks[]` | Per-Active-check failure causes (`check`, `references[]`, `causes[]`, `context[]`, `truncated`). `references[]` are the check-level framework tokens (`OWASP-ASI05`, `OWASP-LLM06`, `AML.T0053`, `TC-AID-01`, `ISO42001-A.4.5`, `ISO27001-A.8.31`) derived from the same crosswalk as the OWASP / ATLAS / Trust Controls scorecards; metadata only, never consulted for severity or acceptance |
 
 Consent gates Hub export, not on-device observation: the local payload is included even when `mode` is `"denied"`. When `with_ai_details` is false, `ai_details` is `null`. See `edamame_core/AIGOVERNANCE.md`.
 
