@@ -1797,7 +1797,7 @@ Get engine status as JSON: running state, interval, last run timestamp, model ag
 
 ### Attack Pattern Detector
 
-Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag. Five checks: token_exfiltration (anomalous + creds), skill_supply_chain (blacklisted + creds), credential_harvest (any session + >= N credential label categories), sandbox_exploitation (suspicious lineage), gateway_binding (exposed listeners). The `credential_harvest` threshold is configurable via `credential_harvest_min_labels` in `cve-detection-params-db.json` (default 3).
+Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag. Eight checks: token_exfiltration (anomalous + creds), skill_supply_chain (blacklisted + creds), credential_harvest (any session + >= N credential label categories), sandbox_exploitation (suspicious lineage), sensitive_material_egress (sensitive or secret-like files open + sustained egress), file_system_tampering (FIM writes to sensitive / temp-staged files, writer-attributed), agent_control_tampering (an agent's enforcement config weakened), agent_denylist_bypass (a denied command re-spelled and run). The `credential_harvest` threshold is configurable via `credential_harvest_min_labels` in `cve-detection-params-db.json` (default 3); per-check default severities are overridable there too. Only HIGH/CRITICAL findings are alertable (`active_alertable_findings`); LOW findings stay visible without alerting.
 
 #### start_vulnerability_detector
 
