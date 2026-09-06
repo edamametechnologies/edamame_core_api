@@ -530,6 +530,10 @@ READ-ONLY. List just the deterministic MCP risk findings (no endpoint inventory)
 
 **Parameters**: None
 
+### `get_harness_efficacy`
+
+READ-ONLY. Harness efficacy attestation (INC-17): one row per known agent governance harness (`agentfield`, `rippletide`, `nono`, `srt`) with `detected`, `declared_scope` (the action classes the product documents itself as confining: `shell_exec` / `filesystem_write` / `credential_access` / `network_egress` / `privilege_escalation`), `in_scope_findings` / `in_scope_checks` / `in_scope_finding_keys` (active alertable attack pattern findings that fired inside that scope -- the deployed control did not bound the agent), `out_of_scope_findings`, and `verdict`: `not_detected` | `unobserved` (present, no in-scope evidence either way -- prevented actions leave no trace) | `failed`. Harness presence is never exculpatory.
+
 ### `get_agent_component_inventories`
 
 READ-ONLY. Get the per-agent component inventory for every discovered agent: components (the agent app, each MCP server it connects to, tool classes, models). Derived from live discovery. Metadata-only.
@@ -912,3 +916,4 @@ Use a per-client credential (from pairing) or shared PSK:
 | 51 | `get_agent_subprocess_usage` | Visibility | Agent critical-subprocess usage (read-only) |
 | 52 | `get_agent_fleet_overview` | Fleet | Fleet command-centre rollup (read-only) |
 | 53 | `get_agent_failure_clusters` | Fleet | Deterministic failed-intent clusters (read-only) |
+| 54 | `get_harness_efficacy` | Visibility | Harness efficacy attestation per governance harness (read-only) |

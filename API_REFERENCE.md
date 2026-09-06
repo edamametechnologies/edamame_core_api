@@ -2609,6 +2609,28 @@ on the next refresh (which is triggered immediately). Fallible envelope
 `{"success": bool, "error": "..."}`. Operator control plane only -- never exposed as
 an MCP tool, since the observed agent must not approve its own rug pull (I1).
 
+### get_harness_efficacy
+
+```
+get_harness_efficacy() -> String
+```
+
+INC-17 harness efficacy attestation. JSON array with one row per known agent
+governance harness (`agentfield`, `rippletide`, `nono`, `srt`): `slug`,
+`display_name`, `detected`, `identity` (governed-agent token when the harness
+exposes one), `declared_scope` (the action classes the product documents itself
+as confining: `shell_exec` / `filesystem_write` / `credential_access` /
+`network_egress` / `privilege_escalation`), `in_scope_findings` /
+`in_scope_checks` / `in_scope_finding_keys` (active alertable attack pattern
+findings whose action class the harness declared it confines -- evidence the
+deployed control did not bound the agent), `out_of_scope_findings`, and the
+`verdict`: `not_detected`, `unobserved` (present, no in-scope evidence either
+way -- prevented actions leave no trace), or `failed`. Read-only projection over
+the current attack pattern report and the last structural refresh; each finding
+also carries the same attribution in `evidence.harness_present` /
+`evidence.harness_action_class` / `evidence.harness_in_scope`. Harness presence
+is never exculpatory: it changes no severity and no CRS.
+
 ### get_agent_component_inventories
 
 ```
