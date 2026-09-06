@@ -2581,6 +2581,34 @@ get_mcp_findings() -> String
 
 Return just the MCP risk findings as a JSON array (`Vec<VisibilityFinding>`) -- severity-graded issues such as unauthenticated or network-exposed endpoints and over-privileged tool surfaces. Lazily ensures a fresh structural snapshot.
 
+### get_mcp_tool_digests
+
+```
+get_mcp_tool_digests() -> String
+```
+
+INC-18 content integrity. JSON array of the MCP tool definitions the agents keep on
+disk (Claude Desktop extension manifests, Codex app-tool cache), hashed per server:
+`endpoint_key` (`<agent_type>|<server_name>`), `definition_hash`, `tool_count`, the
+per-tool `name` / `description` / `digest`, and the persisted approval state
+`baseline_status` (`approved` / `changed` / `unapproved`) with `approved_hash` /
+`approved_at`. Read-only projection of the last structural refresh; the
+`mcp_tool_definition_changed` (rug pull) and `mcp_tool_description_instructions`
+(tool poisoning / line jumping) findings derived from it are served with the other
+`mcp` findings by `get_mcp_findings`.
+
+### agentic_approve_mcp_tool_baseline
+
+```
+agentic_approve_mcp_tool_baseline(endpoint_key: String) -> String
+```
+
+Accept the current tool definitions of one MCP server (`<agent_type>|<server_name>`)
+as the operator-approved baseline, clearing its `mcp_tool_definition_changed` finding
+on the next refresh (which is triggered immediately). Fallible envelope
+`{"success": bool, "error": "..."}`. Operator control plane only -- never exposed as
+an MCP tool, since the observed agent must not approve its own rug pull (I1).
+
 ### get_agent_component_inventories
 
 ```
