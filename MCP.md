@@ -409,6 +409,7 @@ Model-independent heuristic checks (CVE-aligned). Run on their own cadence, inde
 6. **file_system_tampering** (HIGH, CRITICAL for credential stores) -- FIM create / modify / delete of sensitive or temp-staged files, attributed to the writing process lineage
 7. **agent_control_tampering** (HIGH) -- an agent's own enforcement configuration (sandbox, permission rules, network allowlist) moved in the permissive direction; a bare config write with no weakening is recorded at LOW
 8. **agent_denylist_bypass** (HIGH, never demoted) -- a command the agent's permission layer denied was re-issued under a different spelling (`/usr/bin/curl`, `bash -c '...'`) and succeeded; decoded from the agent's own transcript
+9. **package_install_lifecycle** (LOW baseline, HIGH when corroborated) -- install-time execution: a session or FIM writer whose lineage sits in a dependency tree (`node_modules/`, `site-packages/`, `.cargo/registry/`, ...) under a package-manager runtime reached off-host or wrote outside every dependency tree and lockfile (shell rc, `.pth` drop, workflow files); HIGH only with an anomalous / blacklisted session, sensitive material, a suspicious anchor, or a sensitive-path write
 
 ### `get_vulnerability_findings`
 
