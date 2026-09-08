@@ -973,6 +973,22 @@ add_dismiss_rule_from_process(uid: String) -> ()
 
 Create a dismiss rule based on a process.
 
+#### kill_process
+
+```
+kill_process(pid: u32, expected_path: String) -> String
+```
+
+Operator hard kill (`SIGKILL` / `TerminateProcess`) of the process behind a
+finding, a divergence verdict or a session. Returns a fallible envelope
+`{"success": bool, "outcome": {...}, "error"?: String}` where `outcome.outcome`
+is one of `killed`, `not_running`, `identity_mismatch`, `refused`,
+`permission_denied`, `failed`. `expected_path` is the image shown on screen:
+when it no longer matches the pid's current image (recycled pid) the kill is
+refused as `identity_mismatch`. System-critical and EDAMAME processes are
+always `refused`. Standalone daemons kill directly; the sandboxed app crosses
+to the helper. Operator-only -- deliberately not exposed as an MCP tool.
+
 ### Community Sharing
 
 #### get_shared_device_infos
