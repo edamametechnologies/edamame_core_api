@@ -313,49 +313,12 @@ Get real-time status of current AI processing workflow. Returns detailed progres
 
 ## Divergence Tools -- Two-Plane Behavioral Correlation
 
-### `upsert_behavioral_model`
-
-Push a reasoning-plane behavioral model for two-plane correlation. The divergence engine compares this declared model against live system-plane telemetry (sessions, processes, file access) to detect behavioral drift. Models use the v3 schema with expected and negative dimensions.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `window_json` | string | Yes | JSON behavioral model (v3 schema) |
-
-**V3 Schema Dimensions**:
-- Expected: `expected_traffic`, `expected_sensitive_files`, `expected_lan_devices`, `expected_local_open_ports`, `expected_process_paths`, `expected_parent_paths`, `expected_grandparent_paths`, `expected_open_files`, `expected_l7_protocols`, `expected_system_config`
-- Negative: `not_expected_traffic`, `not_expected_sensitive_files`, `not_expected_lan_devices`, `not_expected_local_open_ports`, `not_expected_process_paths`, `not_expected_parent_paths`, `not_expected_grandparent_paths`, `not_expected_open_files`, `not_expected_l7_protocols`, `not_expected_system_config`
-
-**Scope filters** (per-prediction, restrict which sessions are in scope):
-- `scope_process_paths` -- match session's own `process_path` or `cmd[0]`
-- `scope_parent_paths` -- match parent's `parent_process_path`, `parent_script_path`, or `parent_cmd[0]`
-- `scope_grandparent_paths` -- match grandparent's `grandparent_process_path`, `grandparent_script_path`, or `grandparent_cmd[0]`
-- `scope_any_lineage_paths` -- match any of process, parent, or grandparent
-
-Rules use glob-style wildcards (`*` matches any substring). A session matches if any populated scope level matches.
-
-**Expected traffic syntax** (`expected_traffic` array):
-- **Domain-suffix**: `host:port` (e.g. `amazonaws.com:443`) -- matches destinations whose host ends with the domain (e.g. `ec2-xxx.compute-1.amazonaws.com:443`). No glob expansion.
-- **ASN-based**: `asn:OWNER_SUBSTRING` (e.g. `asn:CLOUDFLARENET`) -- matches destinations whose ASN owner (from IP-to-ASN DB) contains the substring (case-insensitive). Use for CDN providers (Cloudflare, Akamai) whose IPs lack predictable domain suffixes.
-
-Common ASN patterns: `asn:CLOUDFLARENET`, `asn:AMAZON`, `asn:AKAMAI`, `asn:FASTLY`, `asn:GOOGLE`, `asn:MICROSOFT`, `asn:NOTION`.
-
----
-
-### `upsert_behavioral_model_from_raw_sessions`
-
-Push raw reasoning-plane sessions and let EDAMAME use its configured internal LLM provider to generate and upsert the behavioral model slice. Used by thin transcript bridges (e.g. Cursor extrapolator) that forward session metadata without running their own LLM.
-
-**Parameters**:
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `raw_sessions_json` | string | Yes | JSON-encoded `RawReasoningSessionPayload` with `agent_type`, `agent_instance_id`, `window_start`, `window_end`, and `sessions` array |
-
-**Payload schema**: Each session in `sessions` must have `session_key`, `started_at`, `modified_at` (RFC 3339), optional `messages`, `derived_expected_traffic`, `tools_called`. The internal LLM produces `SessionPrediction` entries with scope filters and `expected_traffic` (including ASN patterns when appropriate).
-
----
+> **Retired 2026-09:** `upsert_behavioral_model` and
+> `upsert_behavioral_model_from_raw_sessions` are no longer MCP tools. The
+> host-side transcript observer is the only behavioral-model producer; the
+> two names remain as **RPC** methods for operator tooling (see
+> `API_REFERENCE.md`). Reasoning-plane intake on MCP would let the observed
+> agent shape what the observer believes about it.
 
 ### `get_behavioral_model`
 
@@ -880,8 +843,8 @@ Use a per-client credential (from pairing) or shared PSK:
 | 13 | `agentic_process_todos` | Agentic | AI-powered todo processing |
 | 14 | `agentic_execute_action` | Agentic | Execute pending action |
 | 15 | `agentic_get_workflow_status` | Agentic | Workflow progress |
-| 16 | `upsert_behavioral_model` | Divergence | Push reasoning-plane behavioral model |
-| 17 | `upsert_behavioral_model_from_raw_sessions` | Divergence | Build + push model directly from raw session JSON |
+| 16 | ~~`upsert_behavioral_model`~~ | Divergence | Retired 2026-09 (RPC only; observer is the sole producer) |
+| 17 | ~~`upsert_behavioral_model_from_raw_sessions`~~ | Divergence | Retired 2026-09 (RPC only; observer is the sole producer) |
 | 18 | `get_behavioral_model` | Divergence | Read stored behavioral model |
 | 19 | `get_divergence_verdict` | Divergence | Get latest divergence verdict |
 | 20 | `get_divergence_history` | Divergence | Rolling divergence verdict history |
