@@ -1646,7 +1646,7 @@ Behavioral model management and divergence detection between the reasoning plane
 upsert_behavioral_model(window_json: String) -> String
 ```
 
-Push behavioral predictions from the reasoning plane. Accepts a JSON-encoded window of predicted behavior. Returns status JSON.
+Push a behavioral window from the operator plane. Accepts a JSON-encoded window of predicted behavior. Returns status JSON. **Operator-plane only** -- not an MCP tool (retired 2026-09-09); the host-side transcript observer is the sole shipped model producer. An `agent_instance_id` ending in `-observer` is rewritten to `-pushed` at intake.
 
 Behavioral window schema (v3):
 - `window_start`, `window_end`, `ingested_at`, `version`, `hash`
@@ -1660,7 +1660,7 @@ Behavioral window schema (v3):
 upsert_behavioral_model_from_raw_sessions(raw_sessions_json: String) -> String
 ```
 
-Build and upsert a behavioral-model window directly from a JSON array of raw session records (instead of supplying a pre-aggregated window). Used by tests and tools that already have observed sessions and want EDAMAME to derive predicted dimensions automatically. Returns the resulting window JSON.
+Build and upsert a behavioral-model window directly from a JSON array of raw session records (instead of supplying a pre-aggregated window). Used by the in-process transcript observer, plus tests and operator tools that already have observed sessions and want EDAMAME to derive predicted dimensions automatically. Returns the resulting window JSON. **Operator-plane only** -- not an MCP tool (retired 2026-09-09).
 
 #### get_behavioral_model
 
@@ -1807,13 +1807,15 @@ get_divergence_engine_status() -> String
 
 Get engine status as JSON: running state, interval, last run timestamp, model age, last verdict.
 
-**MCP tools**: Five of these methods are exposed as MCP tools: `upsert_behavioral_model`, `get_behavioral_model`, `get_divergence_verdict`, `get_divergence_history`, and `get_divergence_engine_status`.
+**MCP tools**: Four of these methods are exposed as MCP tools: `get_behavioral_model`, `get_divergence_verdict`, `get_divergence_history`, and `get_divergence_engine_status`.
+
+`upsert_behavioral_model` and `upsert_behavioral_model_from_raw_sessions` were **retired from MCP on 2026-09-09** (their names are held in `FORBIDDEN_MCP_MUTATORS` in `src/mcp/handler.rs` so the route-table test asserts their absence). The RPCs remain, on the operator plane only: the host-side transcript observer is the sole shipped model producer, and a window that arrives over RPC claiming the observer's `-observer` instance id is rewritten to `-pushed` at intake (`pushed_instance_id`) so it cannot inherit the policy plane's observer exemptions.
 
 `start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` are direct API control-plane methods and are not exposed via MCP tools.
 
 ### Attack Pattern Detector
 
-Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag. Ten checks: token_exfiltration (anomalous + creds), skill_supply_chain (blacklisted + creds), credential_harvest (any session + >= N credential label categories), sandbox_exploitation (suspicious lineage), sensitive_material_egress (sensitive or secret-like files open + sustained egress), file_system_tampering (FIM writes to sensitive / temp-staged files, writer-attributed), agent_control_tampering (an agent's enforcement config weakened), agent_denylist_bypass (a denied command re-spelled and run), package_install_lifecycle (install-time lineage -- a dependency tree under a package-manager runtime -- reaching off-host or writing outside the tree; LOW unless corroborated), process_memory_scrape (a process obtaining another process's task port or memory, from the kernel task-access stream; CRITICAL for agent / credential-holder targets, HIGH for other control-port / memory-open access; kernel-vouched platform binaries and uncorroborated read-only ports are not reported). The `credential_harvest` threshold is configurable via `credential_harvest_min_labels` in `cve-detection-params-db.json` (default 3); per-check default severities are overridable there too. Only HIGH/CRITICAL findings are alertable (`active_alertable_findings`); LOW findings stay visible without alerting.
+Model-independent detection for sensitive-file access, critical CVE exposure, and other safety-floor findings. Requires the `agentic` feature flag. Eleven checks: token_exfiltration (anomalous + creds), skill_supply_chain (blacklisted + creds), credential_harvest (any session + >= N credential label categories), sandbox_exploitation (suspicious lineage), sensitive_material_egress (sensitive or secret-like files open + sustained egress), file_system_tampering (FIM writes to sensitive / temp-staged files, writer-attributed), agent_control_tampering (an agent's enforcement config weakened), agent_denylist_bypass (a denied command re-spelled and run), package_install_lifecycle (install-time lineage -- a dependency tree under a package-manager runtime -- reaching off-host or writing outside the tree; LOW unless corroborated), process_memory_scrape (a process obtaining another process's task port or memory, from the kernel task-access stream; CRITICAL for agent / credential-holder targets, HIGH for other control-port / memory-open access; kernel-vouched platform binaries and uncorroborated read-only ports are not reported), cloud_metadata_egress (a process querying the cloud instance metadata service -- IMDS `169.254.169.254`, ECS/Fargate `169.254.170.2`, the Azure wire server -- and forwarding the session it gets; LOW on its own, HIGH with corroboration; platform agents and CI-runner internals never fire). The `credential_harvest` threshold is configurable via `credential_harvest_min_labels` in `cve-detection-params-db.json` (default 3); per-check default severities are overridable there too. Only HIGH/CRITICAL findings are alertable (`active_alertable_findings`); LOW findings stay visible without alerting.
 
 #### start_vulnerability_detector
 

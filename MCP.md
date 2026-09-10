@@ -40,7 +40,8 @@ The MCP tool surface therefore keeps observer state and operator control actions
 | Read divergence verdicts / history / engine status | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read vulnerability findings / history / detector status | YES (read-only) | EDAMAME app, edamame_cli RPC |
 | Read active dismissal rules + audit log | YES (read-only) | EDAMAME app, edamame_cli RPC |
-| Read agent visibility (MCP inventory, component inventory, capability graph + reachability, recursion, flight recorder, drift timelines, data-flow / memory / A2A maps, response catalog/history, policy pack/evaluation/attestations, zone promotions, agent inventory, blast radius / harnesses) | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Read agent visibility (MCP inventory + findings, component inventory, capability graph + reachability + effective capabilities, recursion, agent inventory, flight recorder, drift timelines, data-flow / memory / A2A maps, OWASP scorecard, subprocess usage, harness efficacy, fleet overview / failure clusters) | YES (read-only) | EDAMAME app, edamame_cli RPC |
+| Read the ATLAS coverage scorecard (`get_atlas_scorecard`) | **NO** | EDAMAME app, edamame_cli RPC |
 | Add an identity to breach monitoring | YES (strengthens future observation) | EDAMAME app, edamame_cli RPC |
 | Remove an identity from breach monitoring | **NO** | `remove_pwned_email` RPC |
 | Change LAN auto-scan configuration | **NO** | `set_auto_scan` RPC |
@@ -64,6 +65,14 @@ The MCP tool surface therefore keeps observer state and operator control actions
 | Clear dismissal audit log | **NO** | EDAMAME app, edamame_cli RPC |
 
 The corresponding **RPC** endpoints (`agentic_undo_action`, `agentic_undo_all_actions`, `remove_pwned_email`, `set_auto_scan`, `agentic_dismiss_with_scope`, `dismiss_vulnerability_finding`, `clear_divergence_state`, ...) remain available. RPC is the operator-facing control plane (EDAMAME app, `edamame_cli`); MCP is the LLM-facing plane for observation, intent intake, and bounded advisor workflows.
+
+The policy is pinned in code by three lists in `src/mcp/handler.rs` (`mod observer_independence`), asserted by an in-crate route-table test and by the live `tools/list` integration test:
+
+- `REQUIRED_MCP_READS` -- visibility reads that MUST stay reachable over MCP (component inventory, flight recorder, structural runs, drift, data-flow maps, memory inventory, A2A graph, OWASP scorecard, subprocess usage).
+- `FORBIDDEN_MCP_READS` -- operator-only reads. Read-only is the usual justification for MCP exposure, but it is not sufficient when the payload is itself the hazard. Its single entry is **`get_atlas_scorecard`**: every ATLAS row's `coverage_rationale` names the exact telemetry that backs (or fails to back) a detection claim, which in the reasoning plane reads as an evasion guide. It stays on the RPC + app operator surface.
+- `FORBIDDEN_MCP_MUTATORS` -- operator-only mutators (every dismissal / clear / reset, the visibility `refresh_*` projections, `set_transcript_observer_enabled`, `set_lan_auto_scan`, `remove_pwned_email`, the advisor undo pair, and the two retired model-intake tools `upsert_behavioral_model` / `upsert_behavioral_model_from_raw_sessions`).
+
+An entry is added to these lists when a new operator-only RPC lands; an entry is never removed to make a test pass.
 
 CI integration tests that need to clear vulnerability/divergence state between scenarios call the RPC layer directly (`edamame_cli rpc clear_vulnerability_history`, `edamame_cli rpc clear_divergence_state`, etc.) -- these never went through the MCP tool path.
 
