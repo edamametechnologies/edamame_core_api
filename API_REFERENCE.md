@@ -1799,19 +1799,27 @@ start_divergence_engine(enabled: bool, interval_secs: u64) -> String
 
 Enable or disable the divergence engine with optional interval configuration. Returns status JSON.
 
+#### set_divergence_adjudication_mode
+
+```
+set_divergence_adjudication_mode(mode: String) -> String
+```
+
+Operator plane. Whether the divergence engine consults the LLM: `llm` (default; deterministic fallback when the LLM is unavailable), `deterministic` (never consult it; verdicts carry `DETERMINISTIC_ONLY` provenance). `advisory` is accepted and behaves as `llm` for this engine. Persisted with the agentic config. Fallible envelope: `{"success": true, "mode": "..."}` or `{"success": false, "error": "invalid adjudication_mode ..."}`. Added 2026-09-13.
+
 #### get_divergence_engine_status
 
 ```
 get_divergence_engine_status() -> String
 ```
 
-Get engine status as JSON: running state, interval, last run timestamp, model age, last verdict.
+Get engine status as JSON: running state, interval, last run timestamp, model age, last verdict, `ticker_last_tick_at` / `ticker_stalled` (liveness of the driver; `running` is configuration) and `adjudication_mode`.
 
 **MCP tools**: Four of these methods are exposed as MCP tools: `get_behavioral_model`, `get_divergence_verdict`, `get_divergence_history`, and `get_divergence_engine_status`.
 
 `upsert_behavioral_model` and `upsert_behavioral_model_from_raw_sessions` were **retired from MCP on 2026-09-09** (their names are held in `FORBIDDEN_MCP_MUTATORS` in `src/mcp/handler.rs` so the route-table test asserts their absence). The RPCs remain, on the operator plane only: the host-side transcript observer is the sole shipped model producer, and a window that arrives over RPC claiming the observer's `-observer` instance id is rewritten to `-pushed` at intake (`pushed_instance_id`) so it cannot inherit the policy plane's observer exemptions.
 
-`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` are direct API control-plane methods and are not exposed via MCP tools.
+`start_divergence_engine`, `start_vulnerability_detector`, `set_divergence_adjudication_mode`, `set_vulnerability_adjudication_mode`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` are direct API control-plane methods and are not exposed via MCP tools.
 
 ### Attack Pattern Detector
 
@@ -1824,6 +1832,14 @@ start_vulnerability_detector(enabled: bool, interval_secs: u64) -> String
 ```
 
 Enable or disable the attack pattern detector with optional interval configuration. Returns status JSON.
+
+#### set_vulnerability_adjudication_mode
+
+```
+set_vulnerability_adjudication_mode(mode: String) -> String
+```
+
+Operator plane. How the detector publishes when the LLM adjudicator is absent: `llm` (default; a tick the LLM did not answer is withheld -- empty report, `adjudication_status: error|unavailable`), `advisory` (the LLM is consulted; on failure or with no provider the deterministic result is published with `decision_source: DETERMINISTIC_ONLY`), `deterministic` (the LLM, the benign verdict cache and history reuse are never consulted; every tick publishes deterministically). Persisted with the agentic config; `get_vulnerability_detector_status` reports it as `adjudication_mode`. Fallible envelope as above. Not exposed over MCP: the observed agent must not choose its own adjudication. Added 2026-09-13; the measured trade is in `edamame_core/VULNERABILITYDETECTION.md`, "What The Adjudicator Adds, And Publication Without It".
 
 #### get_vulnerability_findings
 
@@ -3066,7 +3082,7 @@ Permanently delete a previously revoked paired client from the persistent regist
 
 The MCP server exposes a subset of these RPCs as MCP tools from `mcp/handler.rs`. The canonical, authoritative list lives in [`MCP.md`](./MCP.md) (see "Tool Summary"). Per the observer-independence policy, mutating dismissal / observer-state RPCs are RPC-only and intentionally excluded from MCP tools (see `MCP.md` "Observer-Independence Policy").
 
-Lifecycle controls such as `start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` remain direct API/CLI operations and are intentionally excluded from MCP tools.
+Lifecycle controls such as `start_divergence_engine`, `start_vulnerability_detector`, `set_divergence_adjudication_mode`, `set_vulnerability_adjudication_mode`, `agentic_set_auto_processing`, `clear_behavioral_model`, `start_file_monitor`, and `stop_file_monitor` remain direct API/CLI operations and are intentionally excluded from MCP tools.
 
 ---
 
