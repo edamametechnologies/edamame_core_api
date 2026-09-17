@@ -2108,7 +2108,7 @@ Convenience wrapper around `agentic_add_dismissal_rule`: dismiss a single findin
 agentic_report_dismissal(request_json: String) -> String
 ```
 
-Operator-initiated, opt-in report of a vulnerability or divergence dismissal to the EDAMAME backend. Mirrors the device-feedback `dislike_device_type` shape: this RPC does NOT change local policy (the dismissal rule is already applied via `agentic_dismiss_with_scope` before this is called) -- it only sends the operator's feedback. Carries the matcher fields, the dismissal scope/severity ceiling/TTL, agent identity, and an optional consent note + email. Returns `{ "success": bool, "error"?: string }`.
+Operator-initiated, opt-in report of a vulnerability or divergence dismissal to the EDAMAME backend. Mirrors the device-feedback `dislike_device_type` shape: this RPC does NOT change local policy (the dismissal rule is already applied via `agentic_dismiss_with_scope` before this is called) -- it only sends the operator's feedback. Carries the matcher fields, the dismissal scope/severity ceiling/TTL, agent identity, and an optional consent note + email. The core attaches, from its own history, what the adjudicator saw and said about the finding (`adjudication`: detector report id, decision source, per-finding model verdict and reasoning, pre-adjudication severity, guardrail tier, detection basis, and the `FindingEvidence` packet and CRS score as JSON), so every reported dismissal is stored as a (features, model verdict, human verdict) row; callers pass nothing extra for it. Returns `{ "success": bool, "error"?: string }`.
 
 #### agentic_remove_dismissal_rule
 
