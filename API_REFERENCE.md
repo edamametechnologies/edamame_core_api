@@ -1446,7 +1446,7 @@ Returns whether an EDAMAME API key is configured.
 agentic_get_action_history() -> Vec<ActionRecordAPI>
 ```
 
-Returns the complete action audit trail (last 30 days).
+Returns the complete action audit trail (last 30 days). Three kinds of record share the list, told apart by `action_type`: advisor actions (`RemediateThreat`, `DismissSession`, ...), attack-pattern findings (`action_type = "VulnerabilityDetection"`, `advice_type = "Vulnerability"`, kept until dismissed) and, since 1.9.2, divergence evidence (`action_type = "DivergenceDetection"`, `advice_type = "Divergence"`, aged out after 30 days). Both finding kinds carry a `finding_key`, a `dismissed` flag and the same flattened finding fields; for divergence rows `vulnerability_check` is the evidence category, `vulnerability_reference` names the plane and category, `vulnerability_open_files` lists the unexpected sensitive paths and `vulnerability_detection_basis` the trigger reason. Dismiss either kind through `agentic_dismiss_with_scope` with the matching `domain` (`scope = finding` for a one-off), and restore by removing the rule named in the row's `dismissed_by_rule` with `agentic_remove_dismissal_rule`.
 
 #### agentic_get_workflow_status
 
@@ -1569,22 +1569,6 @@ agentic_mark_all_actions_read() -> bool
 ```
 
 Mark all actions as read.
-
-#### agentic_dismiss_action
-
-```
-agentic_dismiss_action(finding_key: String) -> bool
-```
-
-Dismiss a specific agentic finding (vulnerability or divergence) so it stops appearing in active reports/notifications. Returns `true` when a matching record was dismissed.
-
-#### agentic_undismiss_action
-
-```
-agentic_undismiss_action(finding_key: String) -> bool
-```
-
-Restore a previously dismissed agentic finding so it surfaces again in reports/notifications. Returns `true` when a matching dismissal was cleared.
 
 ### OAuth Authentication (Internal Provider)
 
@@ -1719,22 +1703,6 @@ get_divergence_incident(incident_id: String) -> String
 
 Get the full record for a single divergence incident (matched by `incident_id`) as JSON. Returns `{ "incident": null }` when the id is unknown.
 
-#### dismiss_divergence_evidence
-
-```
-dismiss_divergence_evidence(finding_key: String) -> String
-```
-
-Dismiss one divergence evidence item by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
-
-#### undismiss_divergence_evidence
-
-```
-undismiss_divergence_evidence(finding_key: String) -> String
-```
-
-Restore a previously dismissed divergence evidence item by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
-
 #### reset_divergence_suppressions
 
 ```
@@ -1857,22 +1825,6 @@ get_vulnerability_history(limit: usize) -> String
 
 Get rolling history of attack pattern detector reports as JSON. `limit` caps the number of entries returned.
 
-#### dismiss_vulnerability_finding
-
-```
-dismiss_vulnerability_finding(finding_key: String) -> String
-```
-
-Dismiss one vulnerability or safety-floor finding by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
-
-#### undismiss_vulnerability_finding
-
-```
-undismiss_vulnerability_finding(finding_key: String) -> String
-```
-
-Restore a previously dismissed vulnerability or safety-floor finding by finding key. Returns JSON with `{ "success": true, "changed": bool }`.
-
 #### dismiss_augmentation_todo
 
 ```
@@ -1974,22 +1926,6 @@ get_attack_pattern_history(limit: usize) -> String
 ```
 
 Alias of `get_vulnerability_history`.
-
-#### dismiss_attack_pattern_finding
-
-```
-dismiss_attack_pattern_finding(finding_key: String) -> String
-```
-
-Alias of `dismiss_vulnerability_finding`.
-
-#### undismiss_attack_pattern_finding
-
-```
-undismiss_attack_pattern_finding(finding_key: String) -> String
-```
-
-Alias of `undismiss_vulnerability_finding`.
 
 #### clear_attack_pattern_history
 
@@ -2093,6 +2029,18 @@ Add a dismissal rule. `rule_json` carries the operator-supplied envelope:
 ```
 
 Returns `{ "success": bool, "rule_id"?: string, "error"?: string }`.
+
+> **Retired in 1.9.1:** `dismiss_vulnerability_finding`, `undismiss_vulnerability_finding`,
+> their `dismiss_attack_pattern_finding` / `undismiss_attack_pattern_finding` aliases,
+> `dismiss_divergence_evidence`, `undismiss_divergence_evidence`, and the bare-`bool`
+> `agentic_dismiss_action` / `agentic_undismiss_action` pair. Three names fronted one
+> operation, and every one of them was a `Finding`-scope dismissal rule in disguise. A
+> one-off dismissal is now `agentic_dismiss_with_scope` with `scope = "finding"`; a
+> restore is `agentic_remove_dismissal_rule` on the rule id that every materialized
+> finding and divergence evidence carries in `dismissed_by_rule`. Removing a broad rule
+> restores everything it covers. The `edamame_posture` subcommands
+> `vulnerability-dismiss` / `-undismiss` and `divergence-dismiss` / `-undismiss` keep
+> working on top of the new pair.
 
 #### agentic_dismiss_with_scope
 

@@ -777,8 +777,6 @@ AI-powered security automation with multiple LLM providers.
 | `agentic_mark_action_read` | action_id: String | bool | Mark action as read |
 | `agentic_mark_action_unread` | action_id: String | bool | Mark action as unread |
 | `agentic_mark_all_actions_read` | -- | bool | Mark all as read |
-| `agentic_dismiss_action` | finding_key: String | bool | Dismiss agentic finding |
-| `agentic_undismiss_action` | finding_key: String | bool | Restore dismissed agentic finding |
 | `get_agentic_memory_stats` | -- | String | In-memory cache snapshot for diagnostics |
 | `get_agentic_notification_history` | limit: usize | String | Recent agentic notifications dispatched |
 | `oauth_signin_internal` | -- | String | OAuth sign-in to EDAMAME Portal |
@@ -794,8 +792,6 @@ AI-powered security automation with multiple LLM providers.
 | `get_behavioral_model_contributors` | -- | String | List components feeding the behavioral model |
 | `get_divergence_verdict` | -- | String | Get latest divergence verdict |
 | `get_divergence_history` | limit: usize | String | Get divergence verdict history |
-| `dismiss_divergence_evidence` | finding_key: String | String | Dismiss divergence evidence item |
-| `undismiss_divergence_evidence` | finding_key: String | String | Restore dismissed divergence evidence item |
 | `reset_divergence_suppressions` | -- | String | Reset every dismissed divergence finding |
 | `get_divergence_debug_trace` | entry_id: String | String | Per-rule trace for a divergence verdict |
 | `debug_run_divergence_tick` | -- | String | Force a divergence-engine tick (diagnostic) |
@@ -808,8 +804,6 @@ AI-powered security automation with multiple LLM providers.
 | `start_vulnerability_detector` | enabled: bool, interval_secs: u64 | String | Start/stop attack pattern detector |
 | `get_vulnerability_findings` | -- | String | Get latest vulnerability/safety-floor report |
 | `get_vulnerability_history` | limit: usize | String | Get attack pattern detector history |
-| `dismiss_vulnerability_finding` | finding_key: String | String | Dismiss vulnerability finding |
-| `undismiss_vulnerability_finding` | finding_key: String | String | Restore dismissed vulnerability finding |
 | `clear_vulnerability_history` | -- | void | Clear attack pattern detector history |
 | `reset_vulnerability_suppressions` | -- | String | Reset every dismissed finding so it surfaces again |
 | `get_vulnerability_debug_trace` | report_id: String | String | Per-check evaluation trace for a specific report |
