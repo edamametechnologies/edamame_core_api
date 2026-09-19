@@ -1357,7 +1357,7 @@ Returns a JSON snapshot of in-memory cache sizes for the agentic subsystem (acti
 get_agentic_notification_history(limit: usize) -> String
 ```
 
-Returns the last `limit` agentic notifications dispatched (Slack/Telegram/Portal/local) as JSON, most recent first. Useful for auditing alert delivery without re-running detector ticks.
+Returns the last `limit` notifications core authored as a JSON array, most recent first. Each entry is `{notification_id, timestamp, source, severity, title, body, route, section, arguments}`: `source` is the message kind (`vulnerability_alert`, `divergence_alert`, `action_report`, ... plus, since 2.0, the system-plane kinds `score_increased`, `score_decreased`, `anomalous_sessions`, `blacklisted_sessions`, `new_devices`, `policy_compliance`, `identity_breaches`, `helper_outdated`, `app_outdated`, `backend_outdated`, `domain_limit`, `subscription_limit`), `section` is the rail section whose notification toggle applies (`Security`, `Agents`, `Threats`, `Identity`, `Network`, `System`, `Trust`, `General`), `route` plus `arguments` (all strings, including `tab` and every localizable value) form the deep link, and `title` / `body` are the English fallback. The app renders from this list and deduplicates on `notification_id`; it composes no notification of its own since 2.0.
 
 #### agentic_get_subscription_status
 
