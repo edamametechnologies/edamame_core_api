@@ -309,7 +309,7 @@ When `with_ai_details` is true, `ScoreAPI.ai_details` carries the local AI gover
 
 Consent gates Hub export, not on-device observation: the local payload is included even when `mode` is `"denied"`. When `with_ai_details` is false, `ai_details` is `null`. See `edamame_core/AIGOVERNANCE.md`.
 
-`ScoreAPI` also includes: overall score (0–100) and stars (0.0–5.0), threat lists with status, model metadata, and compliance.
+`ScoreAPI` also includes: overall score (0–100) and stars (0.0–5.0), the five dimension scores, `ai` (since 2.0: the AI Agent Posture axis, an overlay computed from the metrics tagged `AI Agent Posture`; it does not change `overall` and is `-1` when the model has no such metric), threat lists with status, model metadata, and compliance.
 
 ### get_last_computed_secs
 
@@ -941,13 +941,22 @@ Returns whether remediation advice is available for a session.
 
 ### Dismiss Rules
 
+Since 2.0 a session dismissal is a recurrence-aware dismissal rule in the
+`session` domain (see "Recurrence-Aware Dismissal Rules" below): the four RPCs
+here keep their names and create or remove Session-domain rules, so a
+dismissed session carries `dismissed_by_rule`, gets hit counts and an audit
+trail, shows up in `agentic_list_dismissal_rules("session")`, and comes back
+through `agentic_remove_dismissal_rule` like a finding does. The capture store's
+own `SessionDismissRule` list is imported once at startup and no longer
+written.
+
 #### add_dismiss_rule_from_session
 
 ```
 add_dismiss_rule_from_session(uid: String) -> ()
 ```
 
-Create a dismiss rule based on a session (suppress future alerts for similar sessions).
+Dismiss the session and every later session with the same destination host and port from the same process (a `destination`-scope rule in the `session` domain).
 
 #### remove_dismiss_rule_from_session
 
@@ -955,7 +964,7 @@ Create a dismiss rule based on a session (suppress future alerts for similar ses
 remove_dismiss_rule_from_session(uid: String) -> ()
 ```
 
-Remove a session-based dismiss rule.
+Restore the session: removes every Session-domain rule covering it.
 
 #### add_dismiss_rule_from_port
 
@@ -963,7 +972,7 @@ Remove a session-based dismiss rule.
 add_dismiss_rule_from_port(uid: String) -> ()
 ```
 
-Create a dismiss rule based on a port.
+Dismiss every session to this destination port from the same process (a `destination_port`-scope rule).
 
 #### add_dismiss_rule_from_process
 
@@ -971,7 +980,7 @@ Create a dismiss rule based on a port.
 add_dismiss_rule_from_process(uid: String) -> ()
 ```
 
-Create a dismiss rule based on a process.
+Dismiss every session from this process, whatever the destination (a `process`-scope rule).
 
 #### kill_process
 
@@ -1241,6 +1250,18 @@ get_advisor() -> AdvisorAPI
 ```
 
 Returns the full advisor state including all security todos with priorities, categories, and resolution status.
+
+Since 2.0 each `AdvisorTodoAPI` carries `agentic_action`: the assistant's latest non-obsolete action record on that todo, or `null` when the assistant has not reviewed it (and always `null` on builds without the `agentic` feature). The app's Security radar reads it to colour and rank the todo by the assistant's state without re-deriving it client-side.
+
+| `agentic_action` field | Meaning |
+|---|---|
+| `action_id` | Id of the action record in `agentic_get_action_history` |
+| `result_status` | `auto_resolved` / `requires confirmation` / `escalated` / `failed` |
+| `timestamp` | When the assistant last processed the todo |
+| `priority` | The assistant's priority (`low` .. `critical`) |
+| `reasoning` | The assistant's reasoning summary |
+| `success` | Whether the recorded action succeeded |
+| `undo_available` | Whether the action can still be undone |
 
 ### get_advisor_state
 
@@ -2004,7 +2025,9 @@ This RPC is consumer-neutral by design. Known consumers:
 
 ### Recurrence-Aware Dismissal Rules
 
-Operator-only dismissal-rule plane: every `agentic_*_dismissal*` RPC mutates EDAMAME's local dismissal store and is **not** exposed via MCP (per the observer-independence policy). Rules dismiss vulnerability or divergence findings under explicit scopes (`finding`, `process_for_check`, `process_lineage`, `process_and_material_class`, `agent_workspace_pattern`) with optional TTL and a severity ceiling that controls whether the rule may suppress CRITICAL findings.
+Operator-only dismissal-rule plane: every `agentic_*_dismissal*` RPC mutates EDAMAME's local dismissal store and is **not** exposed via MCP (per the observer-independence policy). Rules dismiss vulnerability or divergence findings under explicit scopes (`finding`, `process_for_check`, `process_lineage`, `process_and_material_class`, `agent_workspace_pattern`, `folder_context`) with optional TTL and a severity ceiling that controls whether the rule may suppress CRITICAL findings.
+
+Since 2.0 the same store holds the `session` domain: network-session dismissals under the scopes `destination` (matcher `destination_ip` + `destination_port`, plus `process_name` / `process_path` when the session is attributed), `destination_port` (`destination_port`, plus the process when attributed) and `process` (`process_name` or `process_path`). Session scopes are rejected on the finding domains and the finding scopes on the session domain. Session rules carry the fixed severity `HIGH` and are created by the `add_dismiss_rule_from_*` RPCs above or directly through `agentic_add_dismissal_rule`.
 
 #### agentic_add_dismissal_rule
 
@@ -2016,9 +2039,11 @@ Add a dismissal rule. `rule_json` carries the operator-supplied envelope:
 
 ```
 {
-  "domain":  "vulnerability" | "divergence",
+  "domain":  "vulnerability" | "divergence" | "session",
   "scope":   "finding" | "process_for_check" | "process_lineage" |
-             "process_and_material_class" | "agent_workspace_pattern",
+             "process_and_material_class" | "agent_workspace_pattern" |
+             "folder_context" |
+             "destination" | "destination_port" | "process",   // session domain only
   "matcher": { ...DismissalRuleMatcherAPI... },
   "ttl_secs": <i64?>,
   "reason":   <string?>,
@@ -2072,7 +2097,7 @@ Remove a dismissal rule by id. Returns `{ "success": bool, "removed": bool, "err
 agentic_list_dismissal_rules(domain: String) -> String
 ```
 
-List dismissal rules. `domain` may be `""` (all), `"vulnerability"`, or `"divergence"`. Returns `{ "success": true, "rules": [DismissalRuleAPI, ...] }`.
+List dismissal rules. `domain` may be `""` (all), `"vulnerability"`, `"divergence"`, or `"session"`. Returns `{ "success": true, "rules": [DismissalRuleAPI, ...] }`. `DismissalRuleMatcherAPI` carries the optional `destination_ip` (canonical address text) used by the session `destination` scope.
 
 #### agentic_list_dismissal_audit_log
 
