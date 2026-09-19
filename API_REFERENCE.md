@@ -1263,48 +1263,6 @@ Since 2.0 each `AdvisorTodoAPI` carries `agentic_action`: the assistant's latest
 | `success` | Whether the recorded action succeeded |
 | `undo_available` | Whether the action can still be undone |
 
-### get_advisor_state
-
-```
-get_advisor_state() -> AdvisorStateAPI
-```
-
-Returns a summary of the advisor state (counts by category, overall progress).
-
-### is_advisor_fully_resolved
-
-```
-is_advisor_fully_resolved() -> bool
-```
-
-Returns true if all security todos have been resolved.
-
-### get_advisor_rag_prompt
-
-```
-get_advisor_rag_prompt() -> String
-```
-
-Returns a RAG-enriched prompt containing the current security context, suitable for passing to an LLM for analysis.
-
-### get_advisor_remediation
-
-```
-get_advisor_remediation(question: String) -> String
-```
-
-Get AI-generated advice for a specific security question, enriched with the current device context.
-
-### request_advisor_report
-
-```
-request_advisor_report(email: String) -> ()
-```
-
-Request a full advisor report to be sent to the specified email address.
-
----
-
 ## Security AI (agentic RPCs)
 
 AI-powered security automation with support for multiple LLM providers. Requires the `agentic` feature flag.
@@ -1356,14 +1314,6 @@ agentic_undo_all_actions() -> UndoAllResultAPI
 ```
 
 Undo all completed actions. Returns counts of successful and failed undos.
-
-#### agentic_cancel_processing
-
-```
-agentic_cancel_processing() -> bool
-```
-
-Cancel the currently running agentic processing.
 
 ### Auto-Processing
 
@@ -1451,14 +1401,6 @@ agentic_set_edamame_api_key(api_key: String) -> bool
 
 Set an EDAMAME API key for headless/CLI authentication (alternative to OAuth).
 
-#### agentic_has_edamame_api_key
-
-```
-agentic_has_edamame_api_key() -> bool
-```
-
-Returns whether an EDAMAME API key is configured.
-
 ### Status & History
 
 #### agentic_get_action_history
@@ -1476,14 +1418,6 @@ agentic_get_workflow_status() -> Option<AgenticWorkflowStatusAPI>
 ```
 
 Returns the status of the currently running workflow, or None if idle.
-
-#### agentic_get_status
-
-```
-agentic_get_status() -> AgenticStatusAPI
-```
-
-Returns the overall agentic system status (configured, authenticated, error state, etc.).
 
 #### agentic_get_summary
 
@@ -1525,14 +1459,6 @@ get_agentic_memory_stats() -> String
 
 Returns a JSON snapshot of in-memory cache sizes for the agentic subsystem (action history, divergence/vulnerability buffers, etc.). Used for diagnosing memory growth and tuning history caps.
 
-#### get_agentic_notification_history
-
-```
-get_agentic_notification_history(limit: usize) -> String
-```
-
-Returns the last `limit` agentic notifications dispatched (Slack/Telegram/Portal/local) as JSON, most recent first. Useful for auditing alert delivery without re-running detector ticks.
-
 #### agentic_get_subscription_status
 
 ```
@@ -1548,14 +1474,6 @@ agentic_get_portal_url() -> String
 ```
 
 Returns the EDAMAME Portal URL.
-
-#### agentic_clear_error
-
-```
-agentic_clear_error() -> bool
-```
-
-Clear the current error state.
 
 #### agentic_clear_action_history
 
@@ -2029,51 +1947,13 @@ Operator-only dismissal-rule plane: every `agentic_*_dismissal*` RPC mutates EDA
 
 Since 2.0 the same store holds the `session` domain: network-session dismissals under the scopes `destination` (matcher `destination_ip` + `destination_port`, plus `process_name` / `process_path` when the session is attributed), `destination_port` (`destination_port`, plus the process when attributed) and `process` (`process_name` or `process_path`). Session scopes are rejected on the finding domains and the finding scopes on the session domain. Session rules carry the fixed severity `HIGH` and are created by the `add_dismiss_rule_from_*` RPCs above or directly through `agentic_add_dismissal_rule`.
 
-#### agentic_add_dismissal_rule
-
-```
-agentic_add_dismissal_rule(rule_json: String) -> String
-```
-
-Add a dismissal rule. `rule_json` carries the operator-supplied envelope:
-
-```
-{
-  "domain":  "vulnerability" | "divergence" | "session",
-  "scope":   "finding" | "process_for_check" | "process_lineage" |
-             "process_and_material_class" | "agent_workspace_pattern" |
-             "folder_context" |
-             "destination" | "destination_port" | "process",   // session domain only
-  "matcher": { ...DismissalRuleMatcherAPI... },
-  "ttl_secs": <i64?>,
-  "reason":   <string?>,
-  "source_finding_key": <string?>,
-  "severity_ceiling": "high_and_below" | "critical_capable",
-  "source_context": { "finding_title", "check_or_category", "process_name", "severity", "details" }
-}
-```
-
-Returns `{ "success": bool, "rule_id"?: string, "error"?: string }`.
-
-> **Retired in 1.9.1:** `dismiss_vulnerability_finding`, `undismiss_vulnerability_finding`,
-> their `dismiss_attack_pattern_finding` / `undismiss_attack_pattern_finding` aliases,
-> `dismiss_divergence_evidence`, `undismiss_divergence_evidence`, and the bare-`bool`
-> `agentic_dismiss_action` / `agentic_undismiss_action` pair. Three names fronted one
-> operation, and every one of them was a `Finding`-scope dismissal rule in disguise. A
-> one-off dismissal is now `agentic_dismiss_with_scope` with `scope = "finding"`; a
-> restore is `agentic_remove_dismissal_rule` on the rule id that every materialized
-> finding and divergence evidence carries in `dismissed_by_rule`. Removing a broad rule
-> restores everything it covers. The `edamame_posture` subcommands
-> `vulnerability-dismiss` / `-undismiss` and `divergence-dismiss` / `-undismiss` keep
-> working on top of the new pair.
-
 #### agentic_dismiss_with_scope
 
 ```
 agentic_dismiss_with_scope(request_json: String) -> String
 ```
 
-Convenience wrapper around `agentic_add_dismissal_rule`: dismiss a single finding under a chosen scope, auto-filling the matcher when `scope = "finding"`. The `request_json` envelope mirrors `agentic_add_dismissal_rule` plus a top-level `finding_key`. Returns `{ "success": bool, "error"?: string }`. The previously returned `rule_id` field was structurally dead (no consumer read it) and has been removed; the underlying rule is still persisted internally and accessible via `agentic_get_dismissal_rules`.
+The single entry point for adding a dismissal rule (the lower-level `agentic_add_dismissal_rule` RPC was retired on 2026-09-19, nothing called it): dismiss a single finding under a chosen scope, auto-filling the matcher when `scope = "finding"`. The `request_json` envelope carries the rule fields (`scope`, `matcher`, `reason`, ...) plus a top-level `finding_key`. Returns `{ "success": bool, "error"?: string }`. The previously returned `rule_id` field was structurally dead (no consumer read it) and has been removed; the underlying rule is still persisted internally and accessible via `agentic_get_dismissal_rules`.
 
 #### agentic_report_dismissal
 
