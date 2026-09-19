@@ -107,14 +107,6 @@ get_branch() -> String
 
 Returns the active threat model branch (e.g., "main").
 
-### get_admin_status
-
-```
-get_admin_status() -> bool
-```
-
-Returns whether the process is running with administrator/root privileges.
-
 ### is_helper_enabled
 
 ```
@@ -155,14 +147,6 @@ get_app_url() -> String
 
 Returns the download URL for the latest application version.
 
-### get_app_latest_version
-
-```
-get_app_latest_version() -> String
-```
-
-Returns the latest available application version string.
-
 ### is_from_store
 
 ```
@@ -201,14 +185,6 @@ clear_demo_platform() -> ()
 ```
 
 Clear the platform override and return to the actual detected platform.
-
-### get_demo_platform
-
-```
-get_demo_platform() -> String
-```
-
-Returns the current demo platform override, or empty string if none.
 
 ### get_all_logs
 
@@ -258,24 +234,6 @@ withdraw_globalpreferences() -> ()
 
 (macOS) Withdraw the pending privacy permissions prompt.
 
-### get_community_devices
-
-```
-get_community_devices() -> Vec<CommunityDeviceAPI>
-```
-
-Returns devices shared via the P2P community protocol on the local network.
-
-### get_p2p_stats
-
-```
-get_p2p_stats() -> P2PStatsAPI
-```
-
-Returns P2P network statistics (peers connected, data exchanged, etc.).
-
----
-
 ## Score & Threats
 
 Security scoring engine, threat evaluation, and remediation management.
@@ -310,14 +268,6 @@ When `with_ai_details` is true, `ScoreAPI.ai_details` carries the local AI gover
 Consent gates Hub export, not on-device observation: the local payload is included even when `mode` is `"denied"`. When `with_ai_details` is false, `ai_details` is `null`. See `edamame_core/AIGOVERNANCE.md`.
 
 `ScoreAPI` also includes: overall score (0–100) and stars (0.0–5.0), the five dimension scores, `ai` (since 2.0: the AI Agent Posture axis, an overlay computed from the metrics tagged `AI Agent Posture`; it does not change `overall` and is `-1` when the model has no such metric), threat lists with status, model metadata, and compliance.
-
-### get_last_computed_secs
-
-```
-get_last_computed_secs() -> i64
-```
-
-Returns the number of seconds since the last score computation completed.
 
 ### get_threat_by_name
 
@@ -358,14 +308,6 @@ rollback(name: String, dont_report: bool) -> ThreatResultAPI
 ```
 
 Rollback a previously applied remediation, restoring the original state.
-
-### update_threats
-
-```
-update_threats() -> ()
-```
-
-Update threat model definitions from the cloud repository.
 
 ### get_threats_url
 
@@ -409,14 +351,6 @@ get_devices() -> Vec<DeviceInfoAPI>
 
 Returns all discovered network devices with full details (IP, MAC, vendor, hostname, open ports, mDNS services, vulnerabilities).
 
-#### get_active_local_devices
-
-```
-get_active_local_devices() -> Vec<DeviceInfoAPI>
-```
-
-Returns only currently active devices on the local network.
-
 #### cancel_scan
 
 ```
@@ -424,14 +358,6 @@ cancel_scan() -> ()
 ```
 
 Cancel any running LAN scan.
-
-#### get_last_gateway_scan
-
-```
-get_last_gateway_scan() -> String
-```
-
-Returns the timestamp of the last gateway scan.
 
 #### mdns_start
 
@@ -491,14 +417,6 @@ get_scan_stats() -> ScanStatsAPI
 
 Returns LAN-scan lifecycle status (in-progress, progress percent, last scan / last gateway scan timestamps, auto-scan, consent, deep/wide flags, device counts) together with a snapshot of the adaptive scan-rate governor (`ScanGovernorStatsAPI`): targets tracked, throttled count, per-target concurrency pool size, minimum rate factor, and the throttled targets with their per-target rate factor, concurrency limit, baseline RTT, and last-active age.
 
-#### set_percentiles
-
-```
-set_percentiles(suspicious_percentile: f64, abnormal_percentile: f64) -> String
-```
-
-Configure the anomaly detection thresholds for the Extended Isolation Forest model.
-
 ### Sessions
 
 #### get_sessions
@@ -532,38 +450,6 @@ get_session_by_uid(uid: String) -> Option<SessionInfoAPI>
 ```
 
 Returns a specific session by its unique identifier.
-
-#### filter_local_sessions
-
-```
-filter_local_sessions(sessions: Vec<SessionInfoAPI>) -> Vec<SessionInfoAPI>
-```
-
-Filter sessions to only local (LAN) traffic.
-
-#### filter_global_sessions
-
-```
-filter_global_sessions(sessions: Vec<SessionInfoAPI>) -> Vec<SessionInfoAPI>
-```
-
-Filter sessions to only external (WAN) traffic.
-
-#### format_sessions_log
-
-```
-format_sessions_log(sessions: Vec<SessionInfoAPI>) -> Vec<String>
-```
-
-Format sessions as human-readable log lines.
-
-#### format_sessions_zeek
-
-```
-format_sessions_zeek(sessions: Vec<SessionInfoAPI>) -> Vec<String>
-```
-
-Format sessions in Zeek (Bro) log format for interoperability.
 
 ### Anomaly Detection & Security
 
@@ -665,14 +551,6 @@ compare_custom_whitelists(whitelist1_json: String, whitelist2_json: String) -> f
 
 Compare two whitelists and return a similarity score (0.0 to 1.0).
 
-#### is_whitelist_stable
-
-```
-is_whitelist_stable(old_whitelist_json: String, new_whitelist_json: String, threshold_percentage: f64) -> bool
-```
-
-Returns whether the whitelist has stabilized (change below threshold).
-
 #### create_custom_whitelists
 
 ```
@@ -738,14 +616,6 @@ set_filter(filter: SessionFilterAPI) -> ()
 ```
 
 Set a display filter for session listings.
-
-#### get_filter
-
-```
-get_filter() -> SessionFilterAPI
-```
-
-Returns the current session display filter.
 
 ### Network Configuration
 
@@ -999,24 +869,6 @@ always `refused`. Standalone daemons kill directly; the sandboxed app crosses
 to the helper. Operator-only -- deliberately not exposed as an MCP tool.
 
 ### Community Sharing
-
-#### get_shared_device_infos
-
-```
-get_shared_device_infos() -> Vec<DeviceInfoAPI>
-```
-
-Returns device information shared to the community.
-
-#### get_received_device_infos
-
-```
-get_received_device_infos() -> Vec<DeviceInfoAPI>
-```
-
-Returns device information received from the community.
-
----
 
 ## Breach Detection / Pwned
 
@@ -1277,7 +1129,7 @@ AI-powered security automation with support for multiple LLM providers. Requires
 agentic_process_todos(confirmation_level: i32) -> AgenticResultsAPI
 ```
 
-The main "Do It For Me" entry point. Processes all security todos using the configured LLM:
+The security-assistant entry point. Processes the security findings using the configured LLM:
 - `confirmation_level = 0`: Auto-resolve safe actions, escalate risky ones
 - `confirmation_level = 1`: Analyze and recommend only (no execution)
 
@@ -1995,20 +1847,6 @@ agentic_list_dismissal_audit_log(limit: u32) -> String
 
 List the dismissal audit log, newest first. `limit = 0` uses the bounded default read limit. Returns `{ "success": true, "entries": [DismissalAuditEntryAPI, ...] }`.
 
-#### agentic_set_dismissal_rule_severity_ceiling
-
-```
-agentic_set_dismissal_rule_severity_ceiling(request_json: String) -> String
-```
-
-Promote or demote a rule's `severity_ceiling`. `request_json`:
-
-```
-{ "rule_id": "<uuid>", "severity_ceiling": "high_and_below" | "critical_capable", "reason": "<required for promotion to critical_capable>" }
-```
-
-Returns `{ "success": bool, "changed": bool, "error"?: string }`.
-
 #### agentic_reset_dismissal_rules
 
 ```
@@ -2016,14 +1854,6 @@ agentic_reset_dismissal_rules() -> String
 ```
 
 Remove every dismissal rule. Returns `{ "success": true, "changed": bool }` indicating whether any rules were actually cleared.
-
-#### agentic_clear_dismissal_audit_log
-
-```
-agentic_clear_dismissal_audit_log() -> String
-```
-
-Truncate the dismissal audit log. Returns `{ "success": true, "changed": bool }`.
 
 #### agentic_prune_expired_dismissal_rules
 
@@ -2328,16 +2158,6 @@ clear_file_events() -> ()
 
 Truncate the in-memory FIM event buffer. Operator-driven hygiene; equivalent to `edamame_cli rpc clear_file_events`.
 
-### get_fim_suspicious_status
-
-```
-get_fim_suspicious_status() -> bool
-```
-
-Return `true` when the FIM event buffer currently contains at least one event flagged as suspicious by the FIM heuristic (sensitive-path write, temp-script staging, etc.). Surfaced in the score bar.
-
----
-
 ## Privacy
 
 Privacy preferences toggles for analytics, crash reporting, and AI failure-detail export to Hub. Persisted on disk and applied at runtime where possible. Persisted struct: `PrivacyPreferences` (see core repo invariants -- new fields MUST add `#[serde(default)]`).
@@ -2376,30 +2196,6 @@ set_export_ai_failure_details(enabled: bool) -> ()
 
 Persist whether structured AI posture failure facts may be included on Hub `report_score`. Default is `false` (consumer opt-in). Facts are metadata-only (agent names, process basenames, harness slugs, secret labels) — never transcripts, env values, or secret content. Posture/Intune can force export via `EDAMAME_EXPORT_AI_FAILURE_DETAILS` / `--export-ai-failure-details` regardless of this toggle; the report's `ai` detail bundle then carries `mode: "forced"`.
 
-### get_analytics_enabled
-
-```
-get_analytics_enabled() -> bool
-```
-
-Read the persisted analytics preference. Mirror of the `analytics_enabled` field in `get_privacy_preferences`.
-
-### get_crash_reports_enabled
-
-```
-get_crash_reports_enabled() -> bool
-```
-
-Read the persisted crash-reports preference. Mirror of the `crash_reports_enabled` field in `get_privacy_preferences`.
-
-### get_export_ai_failure_details
-
-```
-get_export_ai_failure_details() -> bool
-```
-
-Read the persisted AI failure-detail export preference. Mirror of the `export_ai_failure_details` field in `get_privacy_preferences`. Does not reflect posture force — use the `mode` field (`denied` | `enabled` | `forced`) of the `ai` bundle in the Hub wire field `details` for the effective mode.
-
 ### get_consent_document
 
 ```
@@ -2436,14 +2232,6 @@ refresh_agent_visibility() -> String
 
 Force a structural visibility recollection (MCP discovery + component inventory + capability graph). Returns a `{"success": bool, ...}` envelope; on success carries `endpoint_count`, `finding_count`, `component_inventory_count`, and `graph_edge_count`. Most callers can rely on the lazy `ensure_*` refresh in the read RPCs instead of calling this explicitly.
 
-### refresh_recursion_risk
-
-```
-refresh_recursion_risk() -> String
-```
-
-Force a recursion/delegation-tree recorrelation. Returns a `{"success": bool, ...}` envelope; on success carries `tree_count`. The recursion read RPC refreshes lazily, so this is only needed to force an immediate recompute.
-
 ### get_visibility_summary
 
 ```
@@ -2475,56 +2263,6 @@ get_mcp_findings() -> String
 ```
 
 Return just the MCP risk findings as a JSON array (`Vec<VisibilityFinding>`) -- severity-graded issues such as unauthenticated or network-exposed endpoints and over-privileged tool surfaces. Lazily ensures a fresh structural snapshot.
-
-### get_mcp_tool_digests
-
-```
-get_mcp_tool_digests() -> String
-```
-
-INC-18 content integrity. JSON array of the MCP tool definitions the agents keep on
-disk (Claude Desktop extension manifests, Codex app-tool cache), hashed per server:
-`endpoint_key` (`<agent_type>|<server_name>`), `definition_hash`, `tool_count`, the
-per-tool `name` / `description` / `digest`, and the persisted approval state
-`baseline_status` (`approved` / `changed` / `unapproved`) with `approved_hash` /
-`approved_at`. Read-only projection of the last structural refresh; the
-`mcp_tool_definition_changed` (rug pull) and `mcp_tool_description_instructions`
-(tool poisoning / line jumping) findings derived from it are served with the other
-`mcp` findings by `get_mcp_findings`.
-
-### agentic_approve_mcp_tool_baseline
-
-```
-agentic_approve_mcp_tool_baseline(endpoint_key: String) -> String
-```
-
-Accept the current tool definitions of one MCP server (`<agent_type>|<server_name>`)
-as the operator-approved baseline, clearing its `mcp_tool_definition_changed` finding
-on the next refresh (which is triggered immediately). Fallible envelope
-`{"success": bool, "error": "..."}`. Operator control plane only -- never exposed as
-an MCP tool, since the observed agent must not approve its own rug pull (I1).
-
-### get_harness_efficacy
-
-```
-get_harness_efficacy() -> String
-```
-
-INC-17 harness efficacy attestation. JSON array with one row per known agent
-governance harness (`agentfield`, `rippletide`, `nono`, `srt`): `slug`,
-`display_name`, `detected`, `identity` (governed-agent token when the harness
-exposes one), `declared_scope` (the action classes the product documents itself
-as confining: `shell_exec` / `filesystem_write` / `credential_access` /
-`network_egress` / `privilege_escalation`), `in_scope_findings` /
-`in_scope_checks` / `in_scope_finding_keys` (active alertable attack pattern
-findings whose action class the harness declared it confines -- evidence the
-deployed control did not bound the agent), `out_of_scope_findings`, and the
-`verdict`: `not_detected`, `unobserved` (present, no in-scope evidence either
-way -- prevented actions leave no trace), or `failed`. Read-only projection over
-the current attack pattern report and the last structural refresh; each finding
-also carries the same attribution in `evidence.harness_present` /
-`evidence.harness_action_class` / `evidence.harness_in_scope`. Harness presence
-is never exculpatory: it changes no severity and no CRS.
 
 ### get_agent_component_inventories
 

@@ -52,9 +52,9 @@ The MCP tool surface therefore keeps observer state and operator control actions
 | Request / undo a response action, export a case bundle | **NO** | EDAMAME app, edamame_cli RPC |
 | Set policy pack / attest evaluation | **NO** | EDAMAME app, edamame_cli RPC |
 | Request / decide a cross-zone promotion | **NO** | EDAMAME app, edamame_cli RPC |
-| Dismiss a vulnerability finding | **NO** | EDAMAME app (AI tab > Radar > Dismiss), edamame_cli RPC |
+| Dismiss a vulnerability finding | **NO** | EDAMAME app (Security tab > Overview > Dismiss), edamame_cli RPC |
 | Undismiss a vulnerability finding | **NO** | EDAMAME app, edamame_cli RPC |
-| Dismiss a divergence evidence group | **NO** | EDAMAME app (AI tab > Brain Scan > Dismiss), edamame_cli RPC |
+| Dismiss a divergence evidence group | **NO** | EDAMAME app (Agents tab > Divergence > Dismiss), edamame_cli RPC |
 | Undismiss a divergence evidence group | **NO** | EDAMAME app, edamame_cli RPC |
 | Dismiss with scope (recurrence-aware rules) | **NO** | EDAMAME app (Dismiss with scope... dialog), edamame_cli RPC |
 | Remove / promote / demote a dismissal rule | **NO** | EDAMAME app (Dismissal rules section), edamame_cli RPC |
@@ -406,7 +406,7 @@ Get historical vulnerability reports (summaries, most recent first). Each entry 
 |------|------|----------|-------------|
 | `limit` | integer | Yes | Maximum number of past reports to return (most recent first) |
 
-> **Observer-independence**: Mutation operations on vulnerability findings (`agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_vulnerability_history`, `reset_vulnerability_suppressions`; the per-key `dismiss_vulnerability_finding` / `undismiss_vulnerability_finding` RPCs were retired in 1.9.1) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence vulnerability findings about its own behavior. Use the EDAMAME app (AI tab > Radar > Dismiss) or `edamame_cli rpc` for these operations.
+> **Observer-independence**: Mutation operations on vulnerability findings (`agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_vulnerability_history`, `reset_vulnerability_suppressions`; the per-key `dismiss_vulnerability_finding` / `undismiss_vulnerability_finding` RPCs were retired in 1.9.1) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence vulnerability findings about its own behavior. Use the EDAMAME app (Security tab > Overview > Dismiss) or `edamame_cli rpc` for these operations.
 >
 > The attack pattern detector itself is model-independent and does not require an LLM provider. Findings will still surface (and gate consumers like `edamame_posture vulnerability-status --fail-on-findings`) without an LLM. For CI/security and chat workflows, configuring an LLM via `agentic_set_llm_config` is strongly recommended -- EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text.
 

@@ -475,7 +475,7 @@ For `edamame_posture`, generate a PSK with:
 edamame_posture background-mcp-generate-psk
 ```
 
-For the EDAMAME Security desktop app, configure credentials under AI tab > MCP Server Settings (pairing UI or shared PSK).
+For the EDAMAME Security desktop app, configure credentials under Agents tab > MCP Server (pairing UI or shared PSK).
 
 ### MCP Tools
 
@@ -607,26 +607,21 @@ System lifecycle, device information, and platform management.
 | `get_core_version` | -- | String | Core library version |
 | `get_core_info` | -- | String | Core build info |
 | `get_branch` | -- | String | Active threat model branch |
-| `get_admin_status` | -- | bool | Whether running with admin/root |
 | `is_helper_enabled` | -- | bool | Helper daemon availability |
 | `get_helper_state` | -- | String | Helper daemon state |
 | `get_helper_url` | -- | String | Helper daemon URL |
 | `is_outdated_app` | -- | bool | Whether app is outdated |
 | `get_app_url` | -- | String | App download URL |
-| `get_app_latest_version` | -- | String | Latest available version |
 | `is_from_store` | -- | bool | Whether installed from app store |
 | `set_demo_mode` | demo_mode_on: bool, report_to_backend: Option&lt;bool&gt; | void | Toggle demo mode (`report_to_backend` defaults to false) |
 | `set_demo_platform` | platform: String | void | Override platform for demo |
 | `clear_demo_platform` | -- | void | Clear platform override |
-| `get_demo_platform` | -- | String | Current demo platform |
 | `get_all_logs` | -- | String | Complete log output |
 | `get_new_logs` | -- | String | Logs since last call |
 | `unified_log` | level: LogLevel, log: String | void | Send log from consumer |
 | `get_globalpreferences_status` | -- | bool | macOS privacy settings |
 | `prompt_globalpreferences` | title, message | void | Prompt for privacy access |
 | `withdraw_globalpreferences` | -- | void | Withdraw privacy prompt |
-| `get_community_devices` | -- | Vec\<CommunityDeviceAPI\> | P2P community devices |
-| `get_p2p_stats` | -- | P2PStatsAPI | P2P network statistics |
 
 ### Score & Threats (11 methods)
 
@@ -636,13 +631,11 @@ Security scoring, threat detection, and remediation.
 |--------|-----------|---------|-------------|
 | `compute_score` | -- | void | Trigger score computation |
 | `get_score` | complete_only: bool, with_ai_details: bool | ScoreAPI | Get security score and threats; optional AI governance detail |
-| `get_last_computed_secs` | -- | i64 | Seconds since last computation |
 | `get_threat_by_name` | name: String | Option\<ThreatAPI\> | Get specific threat details |
 | `check_policy` | minimum_score, threat_ids, tag_prefixes | bool | Check policy compliance |
 | `get_tag_prefixes` | -- | Vec\<String\> | Available threat tag prefixes |
 | `remediate` | name: String, dont_report: bool | ThreatResultAPI | Remediate a threat |
 | `rollback` | name: String, dont_report: bool | ThreatResultAPI | Rollback a remediation |
-| `update_threats` | -- | void | Update threat models from cloud |
 | `get_threats_url` | -- | String | Threat model source URL |
 | `get_history` | -- | OrderHistoryAPI | Remediation history |
 
@@ -654,7 +647,6 @@ LAN scanning, packet capture, session analysis, whitelists/blacklists, and anoma
 |--------|-----------|---------|-------------|
 | `get_lanscan` | scan, deep_scan, wide_scan | LANScanAPI | Perform LAN scan |
 | `get_devices` | -- | Vec\<DeviceInfoAPI\> | All discovered devices |
-| `get_active_local_devices` | -- | Vec\<DeviceInfoAPI\> | Currently active devices |
 | `cancel_scan` | -- | void | Cancel running scan |
 | `start_capture` | -- | void | Start packet capture |
 | `stop_capture` | -- | void | Stop packet capture |
@@ -673,7 +665,6 @@ LAN scanning, packet capture, session analysis, whitelists/blacklists, and anoma
 | `create_custom_whitelists` | -- | String | Generate whitelist from traffic |
 | `set_custom_blacklists` | blacklist_json: String | void | Set custom blacklist rules |
 | `set_filter` | filter: SessionFilterAPI | void | Set session display filter |
-| `get_filter` | -- | SessionFilterAPI | Get current filter |
 | `get_network` | -- | NetworkAPI | Current network info |
 | `set_network` | network: NetworkAPI | void | Set network config |
 | `get_device_remediation` | ip_address: String | String | AI remediation for device |
@@ -739,11 +730,6 @@ Security recommendations and AI-enriched advice.
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
 | `get_advisor` | -- | AdvisorAPI | Full advisor state with todos |
-| `get_advisor_state` | -- | AdvisorStateAPI | Summary advisor state |
-| `is_advisor_fully_resolved` | -- | bool | All todos resolved |
-| `get_advisor_rag_prompt` | -- | String | RAG-enriched prompt for LLM |
-| `get_advisor_remediation` | question: String | String | AI advice for question |
-| `request_advisor_report` | email: String | void | Email advisor report |
 
 ### Agentic / AI Automation (69 methods)
 
@@ -757,7 +743,6 @@ AI-powered security automation with multiple LLM providers.
 | `agentic_undo_action` | action_id: String | bool | Undo specific action |
 | `agentic_retry_action` | action_id: String | bool | Retry failed action |
 | `agentic_undo_all_actions` | -- | UndoAllResultAPI | Undo all actions |
-| `agentic_cancel_processing` | -- | bool | Cancel current processing |
 | `agentic_set_auto_processing` | enabled, interval_secs, mode | bool | Configure auto-processing |
 | `agentic_get_auto_processing_status` | -- | AgenticAutoProcessingStatusAPI | Auto-processing config |
 | `agentic_set_llm_config` | provider, api_key, model, ... | bool | Configure LLM provider |
@@ -765,14 +750,11 @@ AI-powered security automation with multiple LLM providers.
 | `agentic_set_telegram_interactive_config` | enabled: bool, allowed_user_ids: Vec\<i64\> | bool | Configure Telegram predefined interactive replies |
 | `agentic_test_llm` | -- | LLMTestResultAPI | Test LLM connectivity |
 | `agentic_get_workflow_status` | -- | Option\<AgenticWorkflowStatusAPI\> | Current workflow state |
-| `agentic_get_status` | -- | AgenticStatusAPI | Overall agentic status |
 | `agentic_get_summary` | -- | AgenticSummaryAPI | Summary statistics |
 | `agentic_get_token_usage_stats` | -- | TokenUsageStatsAPI | LLM token consumption |
 | `agentic_get_subscription_status` | -- | AgenticSubscriptionStatusAPI | Subscription info |
 | `agentic_get_portal_url` | -- | String | EDAMAME Portal URL |
 | `agentic_set_edamame_api_key` | api_key: String | bool | Set EDAMAME API key |
-| `agentic_has_edamame_api_key` | -- | bool | API key configured |
-| `agentic_clear_error` | -- | bool | Clear error state |
 | `agentic_clear_action_history` | -- | bool | Clear action history |
 | `agentic_mark_action_read` | action_id: String | bool | Mark action as read |
 | `agentic_mark_action_unread` | action_id: String | bool | Mark action as unread |
