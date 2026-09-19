@@ -1738,9 +1738,9 @@ Force a single attack-pattern-detector tick out of band (without waiting for the
 
 **LLM dependency**: The attack pattern detector itself runs model-independent checks and does not require an LLM provider to surface findings. For CI/security gates and automation flows it is strongly recommended to also configure an LLM via `agentic_set_llm_config`: EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text. Without an LLM, raw heuristic findings still surface and gate consumers (e.g. `edamame_posture vulnerability-status --fail-on-findings`).
 
-#### Attack Pattern Detector RPC Aliases (preferred names; transition surface)
+#### Attack Pattern Detector RPCs (canonical names since 2.0.0)
 
-We are transitioning the user-facing surface from "Vulnerability Detection" to "Attack Pattern Detection". The RPCs below are wire-level aliases of the corresponding `*_vulnerability_*` methods above. Each alias is a thin delegate to the legacy implementation (same arguments, same return shape, same behavior). New integrations should use the `attack_pattern_*` names; existing integrations using `*_vulnerability_*` continue to work. The legacy names will be deprecated in a future major version. See the workspace rule "Vulnerability -> Attack Pattern Detection Terminology Transition" in `edamame_app/.cursor/rules/workspace.mdc` for the full policy.
+Since 2.0.0 the `*_attack_pattern_*` methods below carry the implementation; the corresponding `*_vulnerability_*` methods above are legacy wire-level aliases kept for one release and removed in the next major (MCP tool names are unchanged). Each alias is a thin delegate to the legacy implementation (same arguments, same return shape, same behavior). New integrations should use the `attack_pattern_*` names; existing integrations using `*_vulnerability_*` continue to work. The legacy names will be deprecated in a future major version. See the workspace rule "Vulnerability -> Attack Pattern Detection Terminology Transition" in `edamame_app/.cursor/rules/workspace.mdc` for the full policy.
 
 #### start_attack_pattern_detector
 
