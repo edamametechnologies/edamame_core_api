@@ -1237,7 +1237,7 @@ Submit user feedback with optional log attachments.
 
 ---
 
-## Advisor
+## Security Findings (advisor RPCs)
 
 Security recommendations engine providing prioritized, actionable security todos. The advisor aggregates findings from threats, network analysis, breach detection, and compliance into a unified list.
 
@@ -1305,7 +1305,7 @@ Request a full advisor report to be sent to the specified email address.
 
 ---
 
-## Agentic / AI Automation
+## Security AI (agentic RPCs)
 
 AI-powered security automation with support for multiple LLM providers. Requires the `agentic` feature flag.
 
@@ -1411,7 +1411,7 @@ Configure the LLM provider. Supported providers:
 - `"openai"` -- OpenAI GPT (API key required)
 - `"ollama"` -- Local Ollama instance (base_url required)
 
-This same call also persists optional team-delivery routing for Security Agent notifications:
+This same call also persists optional team-delivery routing for runtime security notifications:
 - Slack bot token + separate action and escalation channels
 - Telegram bot token + destination chat ID
 - `slack_enabled` / `telegram_enabled` -- enable the corresponding notification channel

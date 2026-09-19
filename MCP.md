@@ -64,7 +64,7 @@ The MCP tool surface therefore keeps observer state and operator control actions
 | Reset vulnerability suppressions | **NO** | edamame_cli RPC, integration tests only |
 | Clear dismissal audit log | **NO** | EDAMAME app, edamame_cli RPC |
 
-The corresponding **RPC** endpoints (`agentic_undo_action`, `agentic_undo_all_actions`, `remove_pwned_email`, `set_auto_scan`, `agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_divergence_state`, ...) remain available. RPC is the operator-facing control plane (EDAMAME app, `edamame_cli`); MCP is the LLM-facing plane for observation, intent intake, and bounded advisor workflows.
+The corresponding **RPC** endpoints (`agentic_undo_action`, `agentic_undo_all_actions`, `remove_pwned_email`, `set_auto_scan`, `agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_divergence_state`, ...) remain available. RPC is the operator-facing control plane (EDAMAME app, `edamame_cli`); MCP is the LLM-facing plane for observation, intent intake, and bounded remediation workflows.
 
 The policy is pinned in code by three lists in `src/mcp/handler.rs` (`mod observer_independence`), asserted by an in-crate route-table test and by the live `tools/list` integration test:
 
@@ -147,11 +147,11 @@ Poll pairing status. Returns JSON with `status` and optional `credential`:
 
 ---
 
-## Advisor Tools
+## Security Finding Tools (advisor_*)
 
 ### `advisor_get_todos`
 
-Get sorted list of security todos (threats, network devices with open ports, suspicious sessions, pwned breaches). Returns prioritized list of actionable security items that need attention.
+Get the prioritized list of security findings (threats, network devices with open ports, suspicious sessions, pwned breaches) that the Security radar renders. Returns actionable items that need attention.
 
 **Parameters**: None
 
@@ -837,7 +837,7 @@ Use a per-client credential (from pairing) or shared PSK:
 
 | # | Tool | Category | Description |
 |---|------|----------|-------------|
-| 1 | `advisor_get_todos` | Advisor | Security todos list |
+| 1 | `advisor_get_todos` | Security findings | Prioritized findings list |
 | 2 | `advisor_get_action_history` | Advisor | AI action audit trail |
 | 3 | `get_sessions` | Observation | All sessions with L7 enrichment |
 | 4 | `get_anomalous_sessions` | Observation | ML-flagged anomalous sessions |
