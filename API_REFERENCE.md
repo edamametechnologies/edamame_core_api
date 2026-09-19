@@ -1459,6 +1459,14 @@ get_agentic_memory_stats() -> String
 
 Returns a JSON snapshot of in-memory cache sizes for the agentic subsystem (action history, divergence/vulnerability buffers, etc.). Used for diagnosing memory growth and tuning history caps.
 
+#### get_agentic_notification_history
+
+```
+get_agentic_notification_history(limit: usize) -> String
+```
+
+Returns the last `limit` agentic notifications dispatched (Slack/Telegram/Portal/local) as JSON, most recent first. Useful for auditing alert delivery without re-running detector ticks.
+
 #### agentic_get_subscription_status
 
 ```
