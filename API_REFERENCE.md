@@ -107,6 +107,14 @@ get_branch() -> String
 
 Returns the active threat model branch (e.g., "main").
 
+### get_admin_status
+
+```
+get_admin_status() -> bool
+```
+
+Returns whether the process is running with administrator/root privileges.
+
 ### is_helper_enabled
 
 ```
@@ -359,6 +367,14 @@ cancel_scan() -> ()
 
 Cancel any running LAN scan.
 
+#### get_last_gateway_scan
+
+```
+get_last_gateway_scan() -> String
+```
+
+Returns the timestamp of the last gateway scan.
+
 #### mdns_start
 
 ```
@@ -450,6 +466,30 @@ get_session_by_uid(uid: String) -> Option<SessionInfoAPI>
 ```
 
 Returns a specific session by its unique identifier.
+
+#### filter_global_sessions
+
+```
+filter_global_sessions(sessions: Vec<SessionInfoAPI>) -> Vec<SessionInfoAPI>
+```
+
+Filter sessions to only external (WAN) traffic.
+
+#### format_sessions_log
+
+```
+format_sessions_log(sessions: Vec<SessionInfoAPI>) -> Vec<String>
+```
+
+Format sessions as human-readable log lines.
+
+#### format_sessions_zeek
+
+```
+format_sessions_zeek(sessions: Vec<SessionInfoAPI>) -> Vec<String>
+```
+
+Format sessions in Zeek (Bro) log format for interoperability.
 
 ### Anomaly Detection & Security
 

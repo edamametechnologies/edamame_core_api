@@ -730,6 +730,7 @@ Security recommendations and AI-enriched advice.
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
 | `get_advisor` | -- | AdvisorAPI | Full advisor state with todos |
+| `get_admin_status` | -- | bool | Whether running with admin/root |
 
 ### Agentic / AI Automation (69 methods)
 
