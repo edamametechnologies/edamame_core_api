@@ -1773,7 +1773,7 @@ Enable or disable the divergence engine with optional interval configuration. Re
 set_divergence_adjudication_mode(mode: String) -> String
 ```
 
-Operator plane. Whether the divergence engine consults the LLM: `llm` (default; deterministic fallback when the LLM is unavailable), `deterministic` (never consult it; verdicts carry `DETERMINISTIC_ONLY` provenance). `advisory` is accepted and behaves as `llm` for this engine. Persisted with the agentic config. Fallible envelope: `{"success": true, "mode": "..."}` or `{"success": false, "error": "invalid adjudication_mode ..."}`. Added 2026-09-13.
+Operator plane. Whether the divergence engine consults the LLM: `llm` (deterministic fallback when the LLM is unavailable), `deterministic` (never consult it; verdicts carry `DETERMINISTIC_ONLY` provenance), or `auto` (default since 2.0.0: `advisory` while the LLM config carries credentials, `deterministic` otherwise -- it follows the connection). `advisory` is accepted and behaves as `llm` for this engine. Persisted with the agentic config. Fallible envelope: `{"success": true, "mode": "<setting>", "effective_mode": "<mode the engine runs in now>"}` or `{"success": false, "error": "invalid adjudication_mode ..."}`. Added 2026-09-13; `auto` and `effective_mode` in 2.0.0.
 
 #### get_divergence_engine_status
 
@@ -1781,7 +1781,7 @@ Operator plane. Whether the divergence engine consults the LLM: `llm` (default; 
 get_divergence_engine_status() -> String
 ```
 
-Get engine status as JSON: running state, interval, last run timestamp, model age, last verdict, `ticker_last_tick_at` / `ticker_stalled` (liveness of the driver; `running` is configuration) and `adjudication_mode`.
+Get engine status as JSON: running state, interval, last run timestamp, model age, last verdict, `ticker_last_tick_at` / `ticker_stalled` (liveness of the driver; `running` is configuration), `adjudication_mode` (the mode the engine runs in now) and `adjudication_auto` (2.0.0: that mode was resolved from the LLM connection rather than pinned).
 
 **MCP tools**: Four of these methods are exposed as MCP tools: `get_behavioral_model`, `get_divergence_verdict`, `get_divergence_history`, and `get_divergence_engine_status`.
 
@@ -1807,7 +1807,7 @@ Enable or disable the attack pattern detector with optional interval configurati
 set_vulnerability_adjudication_mode(mode: String) -> String
 ```
 
-Operator plane. How the detector publishes when the LLM adjudicator is absent: `llm` (default; a tick the LLM did not answer is withheld -- empty report, `adjudication_status: error|unavailable`), `advisory` (the LLM is consulted; on failure or with no provider the deterministic result is published with `decision_source: DETERMINISTIC_ONLY`), `deterministic` (the LLM, the benign verdict cache and history reuse are never consulted; every tick publishes deterministically). Persisted with the agentic config; `get_vulnerability_detector_status` reports it as `adjudication_mode`. Fallible envelope as above. Not exposed over MCP: the observed agent must not choose its own adjudication. Added 2026-09-13; the measured trade is in `edamame_core/VULNERABILITYDETECTION.md`, "What The Adjudicator Adds, And Publication Without It".
+Operator plane. How the detector publishes when the LLM adjudicator is absent: `llm` (a tick the LLM did not answer is withheld -- empty report, `adjudication_status: error|unavailable`; what a CI gate wants, see `edamame_posture`), `advisory` (the LLM is consulted; on failure or with no provider the deterministic result is published with `decision_source: DETERMINISTIC_ONLY`), `deterministic` (the LLM, the benign verdict cache and history reuse are never consulted; every tick publishes deterministically), or `auto` (default since 2.0.0: `advisory` while the LLM config carries credentials -- Portal tokens or API key, an own-model key, an Ollama endpoint -- and `deterministic` otherwise, so nothing is ever withheld on a host that did not pin `llm`). Persisted with the agentic config; `get_vulnerability_detector_status` reports the mode the detector runs in as `adjudication_mode` and whether it was resolved as `adjudication_auto`. Fallible envelope: `{"success": true, "mode": "<setting>", "effective_mode": "<mode>"}`. Not exposed over MCP: the observed agent must not choose its own adjudication. Added 2026-09-13; `auto` in 2.0.0; the measured trade is in `edamame_core/VULNERABILITYDETECTION.md`, "What The Adjudicator Adds, And Publication Without It".
 
 #### get_vulnerability_findings
 
@@ -1887,7 +1887,7 @@ Get the per-check evaluation trace for a specific vulnerability report (matched 
 get_vulnerability_detector_status() -> String
 ```
 
-Get detector status as JSON: running state, interval, last run timestamp, and current active-finding count.
+Get detector status as JSON: running state, interval, last run timestamp, current active-finding counts, `adjudication_mode` (the mode the detector runs in now), `adjudication_auto` (2.0.0: resolved from the LLM connection rather than pinned), `adjudication_status`, capture / content-scan / ticker liveness fields.
 
 #### debug_run_vulnerability_detector_tick
 
