@@ -1417,7 +1417,7 @@ Mark all actions as read.
 oauth_signin_internal() -> String
 ```
 
-Initiate OAuth 2.0 sign-in for the Internal LLM provider. Opens the browser for authentication. Returns status message.
+Initiate OAuth 2.0 sign-in for the Internal LLM provider. Opens the browser for authentication and waits (up to 300 s) for the loopback callback on `127.0.0.1:8765`. On iOS and Android core cannot open a browser: it parks the authorize URL for `oauth_take_browser_url` instead. A first connection starts the agentic ticker, since it turns the Assistant on in Review. Returns status message.
 
 #### oauth_refresh_internal
 
@@ -1433,7 +1433,7 @@ Refresh OAuth tokens using the stored refresh token.
 oauth_signout_internal() -> String
 ```
 
-Sign out and clear OAuth tokens.
+Sign out and clear OAuth tokens. On desktop it also opens the Cognito logout URL to clear the Hosted UI session; iOS and Android skip that step (sign-in always asks for credentials again via `prompt=login`).
 
 #### oauth_cancel_signin
 
@@ -1442,6 +1442,14 @@ oauth_cancel_signin() -> String
 ```
 
 Cancel an in-flight OAuth sign-in and release the localhost callback port (`127.0.0.1:8765`) so a retry can bind immediately. Returns JSON with `success` and `cancelled` (`true` when an in-flight attempt was aborted).
+
+#### oauth_take_browser_url
+
+```
+oauth_take_browser_url() -> String
+```
+
+Take the sign-in URL parked by an in-flight `oauth_signin_internal` on iOS and Android, where core cannot open a browser. The app polls it while the sign-in runs and opens the URL in its in-app browser (SFSafariViewController / Custom Tabs); the app stays in the foreground, so the loopback callback completes as on desktop. Returns the URL once and clears it; empty when nothing is waiting, which is always the case on desktop. `oauth_cancel_signin` also clears it.
 
 #### oauth_get_status
 
@@ -1749,6 +1757,14 @@ start_attack_pattern_detector(enabled: bool, interval_secs: u64) -> String
 ```
 
 Alias of `start_vulnerability_detector`.
+
+#### set_attack_pattern_adjudication_mode
+
+```
+set_attack_pattern_adjudication_mode(mode: String) -> String
+```
+
+Canonical name of `set_vulnerability_adjudication_mode` (same modes `llm` / `advisory` / `deterministic` / `auto`, same persisted setting, same envelope `{"success": true, "mode": "<setting>", "effective_mode": "<mode>"}`). Operator plane only, not exposed over MCP.
 
 #### get_attack_pattern_findings
 
