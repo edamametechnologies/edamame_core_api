@@ -399,7 +399,7 @@ Start mDNS service discovery for enhanced device identification.
 start_capture() -> ()
 ```
 
-Start packet capture on the active network interface. Requires `standalone` feature or appropriate platform permissions.
+Start packet capture on the active network interface. Requires `standalone` feature or appropriate platform permissions. This is the operator's switch: a capture started (or taken over) here keeps running when agentic protection turns off; a capture an agentic loop started on its own stops once all three loops are off (see `agentic_set_protection`).
 
 #### stop_capture
 
@@ -407,7 +407,7 @@ Start packet capture on the active network interface. Requires `standalone` feat
 stop_capture() -> ()
 ```
 
-Stop packet capture.
+Stop packet capture. Also clears the mark of a capture protection started, so turning protection back on starts a fresh one.
 
 #### is_capturing
 
@@ -1235,7 +1235,7 @@ The Assistant (auto-processing), the attack pattern detector and the divergence 
 agentic_set_protection(enabled: bool) -> String
 ```
 
-Turn the three loops on or off together. On enables the Assistant at its persisted level (Review unless the operator chose Auto, see `agentic_set_auto_processing`) and, on desktop (macOS, Windows, Linux), the attack pattern detector and the divergence engine; off turns all three off. The setting persists across restarts. Returns `{"success": true}`, or `{"success": false, "error": "..."}` (for example in demo mode).
+Turn the three loops on or off together. On enables the Assistant at its persisted level (Review unless the operator chose Auto, see `agentic_set_auto_processing`) and, on desktop (macOS, Windows, Linux), the attack pattern detector and the divergence engine, starting packet capture and the file monitor if they are not running; off turns all three off and stops the capture and file monitor protection started itself (a capture or monitor the operator started with `start_capture` / `start_file_monitor` keeps running). The setting persists across restarts. Returns `{"success": true}`, or `{"success": false, "error": "..."}` (for example in demo mode).
 
 #### agentic_get_protection_status
 
@@ -2216,7 +2216,7 @@ File integrity monitoring engine. Watches a configured set of paths for create /
 start_file_monitor(paths: Vec<String>) -> ()
 ```
 
-Start the FIM watcher on the supplied list of root paths. When `paths` is empty, the engine falls back to the converged default set computed by `edamame_foundation::fim_support`. The watcher initialization is non-blocking (the recursive `notify` walk runs on `spawn_blocking` so the gRPC handler returns promptly even on hosts with very large watch trees).
+Start the FIM watcher on the supplied list of root paths. When `paths` is empty, the engine falls back to the converged default set computed by `edamame_foundation::fim_support`. The watcher initialization is non-blocking (the recursive `notify` walk runs on `spawn_blocking` so the gRPC handler returns promptly even on hosts with very large watch trees). This is the operator's switch: a monitor started (or taken over) here keeps running when the attack pattern detector turns off; one the detector started on its own stops once neither detection engine runs.
 
 ### stop_file_monitor
 
@@ -2224,7 +2224,7 @@ Start the FIM watcher on the supplied list of root paths. When `paths` is empty,
 stop_file_monitor() -> ()
 ```
 
-Stop the FIM watcher and release its inotify / FSEvents / ReadDirectoryChangesW handles.
+Stop the FIM watcher and release its inotify / FSEvents / ReadDirectoryChangesW handles. Also clears the mark of a monitor the detector started.
 
 ### get_file_events
 
