@@ -351,6 +351,14 @@ get_lanscan(scan: bool, deep_scan: bool, wide_scan: bool) -> LANScanAPI
 
 Perform a LAN scan. `scan` triggers a new scan; `deep_scan` performs port scanning; `wide_scan` extends to full subnet range. Returns all discovered devices with vendor, services, and open ports.
 
+#### get_lanscan_status
+
+```
+get_lanscan_status() -> LANScanStatusAPI
+```
+
+LAN scan state without the device lists and event history: `auto_scan`, `device_count`, `last_scan` (RFC 3339, empty before the first scan) and `scan_in_progress`. Never starts a scan. For always-on UI; `get_lanscan` carries seven device lists and the seen-event history.
+
 #### get_devices
 
 ```
@@ -458,6 +466,14 @@ get_lan_sessions(all: bool) -> LANSessionsAPI
 ```
 
 Returns LAN-specific sessions. When `all` is true, includes historical sessions.
+
+#### get_lan_sessions_status
+
+```
+get_lan_sessions_status() -> LANSessionsStatusAPI
+```
+
+Capture state without the session lists: `is_capturing`, `session_count` (current sessions, 0 while not capturing) and `last_capture` (RFC 3339, empty before the first capture). For always-on UI that only needs these flags; `get_lan_sessions` carries every session's L7 detail up to four times over and is for views that list sessions.
 
 #### get_session_by_uid
 
