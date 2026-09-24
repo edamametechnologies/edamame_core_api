@@ -1207,6 +1207,26 @@ agentic_undo_all_actions() -> UndoAllResultAPI
 
 Undo all completed actions. Returns counts of successful and failed undos.
 
+### Agentic Protection
+
+The Assistant (auto-processing), the attack pattern detector and the divergence engine are off until an operator turns them on, together, with one switch. Nothing turns them on implicitly (capture consent, a model connection, a behavioral model). Operator-only: none of these is exposed over MCP.
+
+#### agentic_set_protection
+
+```
+agentic_set_protection(enabled: bool) -> String
+```
+
+Turn the three loops on or off together. On enables the Assistant at its persisted level (Review unless the operator chose Auto, see `agentic_set_auto_processing`) and, on desktop (macOS, Windows, Linux), the attack pattern detector and the divergence engine; off turns all three off. The setting persists across restarts. Returns `{"success": true}`, or `{"success": false, "error": "..."}` (for example in demo mode).
+
+#### agentic_get_protection_status
+
+```
+agentic_get_protection_status() -> AgenticProtectionStatusAPI
+```
+
+Returns `enabled` (true while any of the three loops runs, so one call to `agentic_set_protection(false)` always turns everything off), `assistant`, `attack_pattern_detection`, `divergence_detection`, and `detection_available` (whether the detection engines exist on this platform).
+
 ### Auto-Processing
 
 #### agentic_set_auto_processing
@@ -1215,7 +1235,7 @@ Undo all completed actions. Returns counts of successful and failed undos.
 agentic_set_auto_processing(enabled: bool, interval_secs: u64, mode: i32) -> bool
 ```
 
-Configure automatic periodic processing. The ticker runs every 5 seconds when enabled and triggers processing at the configured interval.
+Configure the Assistant's level (`mode`: 1 = Review, recommend and wait for confirmation; 0 = Auto, fix safe issues) and cadence. Its on/off is normally driven by `agentic_set_protection`; this call never starts or stops the detection engines. The ticker runs every 5 seconds when enabled and triggers processing at the configured interval.
 
 #### agentic_get_auto_processing_status
 

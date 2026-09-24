@@ -290,19 +290,19 @@ Get the list of all emails currently monitored for HIBP breaches, with per-email
 
 ### `agentic_process_todos`
 
-Process all security todos with AI-powered intelligent triage. LLM analyzes each todo (threats, network issues, breaches) and makes binary decision: `auto_resolve` (safe to fix) or `escalate` (needs review with priority level). Confirmation level: `auto` executes safe items immediately, `manual` records all as pending for user confirmation. Returns categorized results: auto_resolved, requires_confirmation, escalated (with priority), failed. Executed actions remain reversible by an operator through the `agentic_undo_action` and `agentic_undo_all_actions` RPCs; undo is not exposed through MCP.
+Process all security todos with AI-powered intelligent triage. LLM analyzes each todo (threats, network issues, breaches) and makes binary decision: `auto_resolve` (safe to fix) or `escalate` (needs review with priority level). Confirmation level: `auto` executes safe threat and policy remediations immediately, `manual` records all as pending for user confirmation. Dismissals (network sessions, open ports, breaches) are never executed over MCP, whatever the level: they are recorded as `requires confirmation` for the operator, since the observed agent must not be able to silence evidence about itself. Returns categorized results: auto_resolved, requires_confirmation, escalated (with priority), failed. Executed actions remain reversible by an operator through the `agentic_undo_action` and `agentic_undo_all_actions` RPCs; undo is not exposed through MCP.
 
 **Parameters**:
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `confirmation_level` | string | "manual" | `"auto"` to execute safe items immediately, `"manual"` to queue for approval |
+| `confirmation_level` | string | "manual" | `"auto"` to execute safe threat and policy remediations immediately, `"manual"` to queue for approval |
 
 ---
 
 ### `agentic_execute_action`
 
-Execute a pending action that requires user confirmation. Takes an `action_id` from history (where `result_status` is `requires confirmation` or `escalated`). Performs the actual remediation/dismissal and records success/failure.
+Execute a pending action that requires user confirmation. Takes an `action_id` from history (where `result_status` is `requires confirmation` or `escalated`). Performs the remediation of a threat or policy and records success/failure. Dismissal actions (network sessions, open ports, breaches) are operator-only: the tool returns `success: false` for them and the operator confirms them in the app or over RPC.
 
 **Parameters**:
 
