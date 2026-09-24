@@ -1175,6 +1175,8 @@ The security-assistant entry point. Processes the security findings using the co
 
 Returns results categorized as: auto_resolved, requires_confirmation, escalated, failed.
 
+The scheduled assistant loop retries a todo whose analysis failed only after a backoff (10 min, doubling to 6 h); this operator-requested entry point clears that backoff and retries every failed todo now.
+
 #### agentic_execute_action
 
 ```
@@ -1353,7 +1355,7 @@ Returns LLM token consumption statistics (input tokens, output tokens, total cos
 agentic_get_loop_token_usage() -> LoopTokenUsageAPI
 ```
 
-Returns per-loop LLM token usage broken down across the three agentic loops: `agentic` (todo auto-processing), `vuln` (attack pattern detector LLM adjudication), and `divergence` (divergence engine LLM adjudication, including the raw-session model ingest path). Each loop reports `*_in` and `*_out` token counts plus a shared `since_unix_secs` reset timestamp. Used to attribute LLM cost to the loop that generated it.
+Returns per-loop LLM token usage broken down across four buckets: `agentic` (the Security assistant: todo analysis and escalation adjudication), `vuln` (attack pattern detector LLM adjudication), `divergence` (divergence engine LLM adjudication, including the raw-session model ingest path), and `coach` (the AI coach, counted apart from the assistant since 2.0; counters persisted before 2.0 keep their coach spend in `agentic_*`). Each bucket reports `*_in` and `*_out` token counts plus a shared `since_unix_secs` reset timestamp. Used to attribute LLM cost to the loop that generated it.
 
 #### agentic_reset_loop_token_usage
 

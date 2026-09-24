@@ -331,7 +331,7 @@ Get real-time status of current AI processing workflow. Returns detailed progres
 
 ### `get_behavioral_model`
 
-Read the currently stored behavioral model. Returns the most recently upserted model or empty if none has been published. Useful for verifying model state before triggering divergence analysis.
+Read the currently stored behavioral model. Returns the most recently upserted model or empty if none has been published. Useful for verifying model state before triggering divergence analysis. Transcript bodies are never included; the transcript text left in each prediction's `raw_input` (title, commands, tool-call targets, denied / bypassing commands) follows the operator's visibility capture tier: withheld at `metadata_only` (a command keeps its program name), secret-masked at `redacted_excerpt`.
 
 **Parameters**: None
 
@@ -488,7 +488,7 @@ the suspicious-event indicator.
 
 ## Agent Visibility Tools
 
-Read-only structural visibility into the agents running on this host (Stage A discovery + Stage B explainability): the MCP attack surface, per-agent software bill-of-materials, the capability graph and trust-zone reachability, recursion/delegation risk, the hash-chained run flight recorder, goal/delegation drift timelines, and sensitive data-flow / memory / agent-to-agent maps. **Retired 1.7.0 from MCP and RPC:** tool-call firewall, ADR response-action catalog/history, and policy pack / evaluation / attestation / zone-promotion tools. Each tool lazily ensures a fresh snapshot before returning. All output is **metadata-only** -- it never includes secret values, credential bodies, or transcript content (only structural markers and goal hashes are derived). Requires the `agentic` feature flag.
+Read-only structural visibility into the agents running on this host (Stage A discovery + Stage B explainability): the MCP attack surface, per-agent software bill-of-materials, the capability graph and trust-zone reachability, recursion/delegation risk, the hash-chained run flight recorder, goal/delegation drift timelines, and sensitive data-flow / memory / agent-to-agent maps. **Retired 1.7.0 from MCP and RPC:** tool-call firewall, ADR response-action catalog/history, and policy pack / evaluation / attestation / zone-promotion tools. Each tool lazily ensures a fresh snapshot before returning. Output never includes secret values, credential bodies or transcript bodies; the flight recorders carry run titles, command lines and tool-error text only as the operator's visibility capture tier allows (withheld at `metadata_only`, secret-masked at `redacted_excerpt`). Requires the `agentic` feature flag.
 
 These tools share their names and behavior with the corresponding RPC methods documented in [API_REFERENCE.md](API_REFERENCE.md#agent-visibility); the MCP exposure is read-only by design (observer-independence I1). Every mutator -- `refresh_*`, `set_visibility_capture_tier`, `set_transcript_observer_enabled` -- plus the typed UI reads (`get_visibility_summary`, `get_visibility_capture_tier`) are operator/UI control-plane only and are intentionally **not** exposed as MCP tools. An observed agent can read every structural finding about itself, including its own observer state, but cannot weaken or silence the controls that watch it.
 
@@ -546,13 +546,13 @@ READ-ONLY. Per-agent effective (transitively reachable) capabilities over the de
 
 ### `list_recent_runs`
 
-READ-ONLY. List the recorded reasoning runs (the flight-recorder index). Each summary has `run_id` (`agent_type::agent_instance_id::session_key`), timestamps, event/alertable counts, max severity, and a chain-valid flag. Pass a `run_id` to `get_run_provenance` for the full record.
+READ-ONLY. List the recorded reasoning runs (the flight-recorder index). Each summary has `run_id` (`agent_type::agent_instance_id::session_key`), timestamps, event/alertable counts, max severity, and a chain-valid flag. Pass a `run_id` to `get_run_provenance` for the full record. Transcript text -- a run title (the prompt's first line), command lines, tool-error messages -- follows the operator's visibility capture tier: withheld at `metadata_only` (a command keeps its program name, an error its class, a title falls back to the session key), secret-masked at `redacted_excerpt` (the default), verbatim only at `forensic_full_content`. Never transcript bodies.
 
 **Parameters**: None
 
 ### `get_run_provenance`
 
-READ-ONLY. Get the full flight record for one run: the ordered, replayable, hash-chained event stream (`session_start` -> `tool_call`/`command`/`expected_egress` -> `divergence_verdict` -> `divergence_evidence` -> `session_end`), each event carrying plane/kind/summary/severity and `prev_hash`/`hash` chain links, plus the causal edges and `max_severity`/`alertable_event_count`/`chain_valid`. Returns `{}` when the run is unknown. Metadata-only.
+READ-ONLY. Get the full flight record for one run: the ordered, replayable, hash-chained event stream (`session_start` -> `tool_call`/`command`/`expected_egress` -> `divergence_verdict` -> `divergence_evidence` -> `session_end`), each event carrying plane/kind/summary/severity and `prev_hash`/`hash` chain links, plus the causal edges and `max_severity`/`alertable_event_count`/`chain_valid`. Returns `{}` when the run is unknown. Transcript text -- a run title (the prompt's first line), command lines, tool-error messages -- follows the operator's visibility capture tier: withheld at `metadata_only` (a command keeps its program name, an error its class, a title falls back to the session key), secret-masked at `redacted_excerpt` (the default), verbatim only at `forensic_full_content`. Never transcript bodies.
 
 **Parameters**:
 
@@ -566,7 +566,7 @@ READ-ONLY. List LLM-free structural reasoning runs built only from raw
 transcript session lifecycle events. Each run includes its ID, title,
 timestamps, event and edge counts, and hash-chain validity. This surface does
 not carry divergence severity; use `list_recent_runs` for the
-divergence-correlated recorder.
+divergence-correlated recorder. Transcript text -- a run title (the prompt's first line), command lines, tool-error messages -- follows the operator's visibility capture tier: withheld at `metadata_only` (a command keeps its program name, an error its class, a title falls back to the session key), secret-masked at `redacted_excerpt` (the default), verbatim only at `forensic_full_content`. Never transcript bodies.
 
 **Parameters**: None
 
@@ -574,7 +574,7 @@ divergence-correlated recorder.
 
 READ-ONLY. Get one LLM-free structural flight record: ordered, hash-chained
 reasoning-plane events and causal edges, without divergence verdicts or
-evidence. Returns `{}` when the run is unknown.
+evidence. Returns `{}` when the run is unknown. Transcript text -- a run title (the prompt's first line), command lines, tool-error messages -- follows the operator's visibility capture tier: withheld at `metadata_only` (a command keeps its program name, an error its class, a title falls back to the session key), secret-masked at `redacted_excerpt` (the default), verbatim only at `forensic_full_content`. Never transcript bodies.
 
 **Parameters**:
 
@@ -694,7 +694,7 @@ READ-ONLY. Fleet command-centre rollup for all observed agents: headline counts 
 
 ### `get_agent_failure_clusters`
 
-READ-ONLY. Deterministic failed-intent clusters: agent tool errors grouped by stable `<tool>|<error_class>` keys (error classes: timeout / permission / not_found / rate_limit / syntax / network / cancelled / other, classified by a fixed keyword pass -- no LLM). Each cluster has count, affected agents and session count, first/last seen, and a capture-tier-gated example snippet.
+READ-ONLY. Deterministic failed-intent clusters: agent tool errors grouped by stable `<tool>|<error_class>` keys (error classes: timeout / permission / not_found / rate_limit / syntax / network / cancelled / other, classified by a fixed keyword pass -- no LLM). Each cluster has count, affected agents and session count, first/last seen, and an example whose session title and error text follow the operator's visibility capture tier (withheld at `metadata_only`, secret-masked at `redacted_excerpt`).
 
 **Parameters**:
 - `window_minutes` (integer, optional): Look-back window; `0` uses the 24h default.
