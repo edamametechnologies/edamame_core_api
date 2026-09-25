@@ -70,7 +70,7 @@ The policy is pinned in code by three lists in `src/mcp/handler.rs` (`mod observ
 
 - `REQUIRED_MCP_READS` -- visibility reads that MUST stay reachable over MCP (component inventory, flight recorder, structural runs, drift, data-flow maps, memory inventory, A2A graph, OWASP scorecard, subprocess usage).
 - `FORBIDDEN_MCP_READS` -- operator-only reads. Read-only is the usual justification for MCP exposure, but it is not sufficient when the payload is itself the hazard. Its single entry is **`get_atlas_scorecard`**: every ATLAS row's `coverage_rationale` names the exact telemetry that backs (or fails to back) a detection claim, which in the reasoning plane reads as an evasion guide. It stays on the RPC + app operator surface.
-- `FORBIDDEN_MCP_MUTATORS` -- operator-only mutators (every dismissal / clear / reset, the visibility `refresh_*` projections, `set_transcript_observer_enabled`, `set_lan_auto_scan`, `remove_pwned_email`, the advisor undo pair, and the two retired model-intake tools `upsert_behavioral_model` / `upsert_behavioral_model_from_raw_sessions`).
+- `FORBIDDEN_MCP_MUTATORS` -- operator-only mutators (every dismissal / clear / reset, the visibility `refresh_*` projections, `set_transcript_observer_enabled`, `set_lan_auto_scan`, `remove_pwned_email`, the advisor undo pair, turning protection or a detection engine on or off (`agentic_set_protection`, `start_attack_pattern_detector` / `start_vulnerability_detector`, `start_divergence_engine`), `kill_process`, `agentic_approve_mcp_tool_baseline`, and the two retired model-intake tools `upsert_behavioral_model` / `upsert_behavioral_model_from_raw_sessions`).
 
 An entry is added to these lists when a new operator-only RPC lands; an entry is never removed to make a test pass.
 
@@ -363,7 +363,7 @@ Get the divergence engine runtime status: whether it is running, the configured 
 
 **Parameters**: None
 
-> **Observer-independence**: Mutation operations on divergence findings (`agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_divergence_state`; the per-key `dismiss_divergence_evidence` / `undismiss_divergence_evidence` RPCs were retired in 1.9.1) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence findings about its own behavior. Use the EDAMAME app (AI tab > Brain Scan) or `edamame_cli rpc` for these operations.
+> **Observer-independence**: Mutation operations on divergence findings (`agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_divergence_state`; the per-key `dismiss_divergence_evidence` / `undismiss_divergence_evidence` RPCs were retired in 2.0.0) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence findings about its own behavior. Use the EDAMAME app (Agents > Divergence, Security > AI History) or `edamame_cli rpc` for these operations.
 >
 > Lifecycle controls (`start_divergence_engine`, `start_vulnerability_detector`, `agentic_set_auto_processing`, `start_file_monitor`, `stop_file_monitor`) are direct RPC/CLI control plane methods and are intentionally **not** exposed via MCP tools either.
 
@@ -406,7 +406,7 @@ Get historical vulnerability reports (summaries, most recent first). Each entry 
 |------|------|----------|-------------|
 | `limit` | integer | Yes | Maximum number of past reports to return (most recent first) |
 
-> **Observer-independence**: Mutation operations on vulnerability findings (`agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_vulnerability_history`, `reset_vulnerability_suppressions`; the per-key `dismiss_vulnerability_finding` / `undismiss_vulnerability_finding` RPCs were retired in 1.9.1) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence vulnerability findings about its own behavior. Use the EDAMAME app (Security tab > Overview > Dismiss) or `edamame_cli rpc` for these operations.
+> **Observer-independence**: Mutation operations on vulnerability findings (`agentic_dismiss_with_scope`, `agentic_remove_dismissal_rule`, `clear_vulnerability_history`, `reset_vulnerability_suppressions`; the per-key `dismiss_vulnerability_finding` / `undismiss_vulnerability_finding` RPCs were retired in 2.0.0) are intentionally **not** exposed via MCP. The reasoning plane must not be able to silence vulnerability findings about its own behavior. Use the EDAMAME app (Security tab > Overview > Dismiss) or `edamame_cli rpc` for these operations.
 >
 > The attack pattern detector itself is model-independent and does not require an LLM provider. Findings will still surface (and gate consumers like `edamame_posture vulnerability-status --fail-on-findings`) without an LLM. For CI/security and chat workflows, configuring an LLM via `agentic_set_llm_config` is strongly recommended -- EDAMAME can then adjudicate findings, suppress likely false positives, and produce clearer alert text.
 

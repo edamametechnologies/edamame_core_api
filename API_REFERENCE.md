@@ -38,34 +38,38 @@ System initialization, lifecycle management, device information, and platform ut
 
 ### initialize
 
-> **Note**: `initialize` is a special entry point, not registered via the `rpc!()` macro. It accepts a platform-specific `StreamSink` for event delivery (Flutter) or is called without it (standalone/CLI). It must be called before any other API method.
+> **Note**: `initialize` is a special entry point, not registered via the `rpc!()` macro. It must be called before any other API method. Events are delivered separately, through `create_event_stream`.
 
 ```
 initialize(
     executable_type: String,
     branch: String,
-    locale: String,
-    device_info: String,
-    sink: StreamSink<u64>,       // Flutter event stream (omitted in standalone)
-    pwned: bool,
-    flodbadd: bool,
-    trust: bool,
-    agentic: bool
+    language: String,
+    system_info: SystemInfoAPI,
+    computing_enabled: bool,
+    reporting_enabled: bool,
+    community_enabled: bool,
+    server_enabled: bool,
+    analytics_enabled: bool,
+    demo_mode: bool
 ) -> ()
 ```
 
-Initialize EDAMAME Core. Must be called before any other API method. Configures feature availability and event delivery.
+Initialize EDAMAME Core. Must be called before any other API method.
 
 Parameters:
-- `executable_type`: Identifies the consumer (e.g., "app", "posture", "cli")
+- `executable_type`: Identifies the consumer (e.g. "app", "posture", "cli")
 - `branch`: Threat model branch to use (typically "main")
-- `locale`: User locale for localized threat descriptions (e.g., "en", "fr")
-- `device_info`: JSON-encoded device information string
-- `sink`: Flutter `StreamSink<u64>` for receiving event bitmasks (omitted in standalone builds)
-- `pwned`: Enable breach detection feature
-- `flodbadd`: Enable network scanning and capture feature
-- `trust`: Enable domain connection and compliance feature
-- `agentic`: Enable AI automation feature
+- `language`: User locale for localized threat descriptions (e.g. "EN", "FR")
+- `system_info`: The host description the consumer collected (`SystemInfoAPI`)
+- `computing_enabled`: Run the score and threat computation
+- `reporting_enabled`: Report the score to the Hub
+- `community_enabled`: Join the LAN community (peer device sharing)
+- `server_enabled`: This process owns the runtime (the EDAMAME app, the posture daemon): only then are the MCP server auto-started from its saved config and session capture / the file monitor started or stopped for the agentic loops. A CLI one-shot passes `false`.
+- `analytics_enabled`: Send product analytics
+- `demo_mode`: Serve the demo data set
+
+Events: `create_event_stream(name: String, mask: u128, stream: StreamSink<u128>)` subscribes a named stream to the `CoreEvent` bits in `mask`; each delivery carries one event bit.
 
 ### terminate
 
@@ -1339,7 +1343,7 @@ Set an EDAMAME API key for headless/CLI authentication (alternative to OAuth).
 agentic_get_action_history() -> Vec<ActionRecordAPI>
 ```
 
-Returns the complete action audit trail (last 30 days). Three kinds of record share the list, told apart by `action_type`: advisor actions (`RemediateThreat`, `DismissSession`, ...), attack-pattern findings (`action_type = "VulnerabilityDetection"`, `advice_type = "Vulnerability"`, kept until dismissed) and, since 1.9.2, divergence evidence (`action_type = "DivergenceDetection"`, `advice_type = "Divergence"`, aged out after 30 days). Both finding kinds carry a `finding_key`, a `dismissed` flag and the same flattened finding fields; for divergence rows `vulnerability_check` is the evidence category, `vulnerability_reference` names the plane and category, `vulnerability_open_files` lists the unexpected sensitive paths and `vulnerability_detection_basis` the trigger reason. Dismiss either kind through `agentic_dismiss_with_scope` with the matching `domain` (`scope = finding` for a one-off), and restore by removing the rule named in the row's `dismissed_by_rule` with `agentic_remove_dismissal_rule`.
+Returns the complete action audit trail (last 30 days). Three kinds of record share the list, told apart by `action_type`: advisor actions (`RemediateThreat`, `DismissSession`, ...), attack-pattern findings (`action_type = "VulnerabilityDetection"`, `advice_type = "Vulnerability"`, kept until dismissed) and, since 2.0.0, divergence evidence (`action_type = "DivergenceDetection"`, `advice_type = "Divergence"`, aged out after 30 days). Both finding kinds carry a `finding_key`, a `dismissed` flag and the same flattened finding fields; for divergence rows `vulnerability_check` is the evidence category, `vulnerability_reference` names the plane and category, `vulnerability_open_files` lists the unexpected sensitive paths and `vulnerability_detection_basis` the trigger reason. Dismiss either kind through `agentic_dismiss_with_scope` with the matching `domain` (`scope = finding` for a one-off), and restore by removing the rule named in the row's `dismissed_by_rule` with `agentic_remove_dismissal_rule`.
 
 #### agentic_get_workflow_status
 
@@ -1455,7 +1459,7 @@ Mark all actions as read.
 oauth_signin_internal() -> String
 ```
 
-Initiate OAuth 2.0 sign-in for the Internal LLM provider. Opens the browser for authentication and waits (up to 300 s) for the loopback callback on `127.0.0.1:8765`. On iOS and Android core cannot open a browser: it parks the authorize URL for `oauth_take_browser_url` instead. A first connection starts the agentic ticker, since it turns the Assistant on in Review. Returns status message.
+Initiate OAuth 2.0 sign-in for the Internal LLM provider. Opens the browser for authentication and waits (up to 300 s) for the loopback callback on `127.0.0.1:8765`. On iOS and Android core cannot open a browser: it parks the authorize URL for `oauth_take_browser_url` instead. Signing in never turns a loop on (only `agentic_set_protection` does); if protection is already on, the Assistant starts working with the new session. Returns status message.
 
 #### oauth_refresh_internal
 
@@ -1786,7 +1790,7 @@ Force a single attack-pattern-detector tick out of band (without waiting for the
 
 #### Attack Pattern Detector RPCs (canonical names since 2.0.0)
 
-Since 2.0.0 the `*_attack_pattern_*` methods below carry the implementation; the corresponding `*_vulnerability_*` methods above are legacy wire-level aliases kept for one release and removed in the next major (MCP tool names are unchanged). Each alias is a thin delegate to the legacy implementation (same arguments, same return shape, same behavior). New integrations should use the `attack_pattern_*` names; existing integrations using `*_vulnerability_*` continue to work. The legacy names will be deprecated in a future major version. See the workspace rule "Vulnerability -> Attack Pattern Detection Terminology Transition" in `edamame_app/.cursor/rules/workspace.mdc` for the full policy.
+Since 2.0.0 the `*_attack_pattern_*` methods below carry the implementation; the corresponding `*_vulnerability_*` methods above are legacy wire-level aliases kept for one release and removed in the next major (MCP tool names are unchanged). Each `*_vulnerability_*` method is a legacy alias delegating to its canonical `*_attack_pattern_*` twin (same arguments, same return shape, same behavior). New integrations should use the `attack_pattern_*` names; existing integrations using `*_vulnerability_*` continue to work until the next major. See the workspace rule "Vulnerability -> Attack Pattern Detection Terminology Transition" in `edamame_app/.cursor/rules/workspace.mdc` for the full policy.
 
 #### start_attack_pattern_detector
 
@@ -1794,7 +1798,7 @@ Since 2.0.0 the `*_attack_pattern_*` methods below carry the implementation; the
 start_attack_pattern_detector(enabled: bool, interval_secs: u64) -> String
 ```
 
-Alias of `start_vulnerability_detector`.
+Canonical name; `start_vulnerability_detector` is its legacy alias.
 
 #### set_attack_pattern_adjudication_mode
 
@@ -1810,7 +1814,7 @@ Canonical name of `set_vulnerability_adjudication_mode` (same modes `llm` / `adv
 get_attack_pattern_findings() -> String
 ```
 
-Alias of `get_vulnerability_findings`.
+Canonical name; `get_vulnerability_findings` is its legacy alias.
 
 #### get_attack_pattern_history
 
@@ -1818,7 +1822,7 @@ Alias of `get_vulnerability_findings`.
 get_attack_pattern_history(limit: usize) -> String
 ```
 
-Alias of `get_vulnerability_history`.
+Canonical name; `get_vulnerability_history` is its legacy alias.
 
 #### clear_attack_pattern_history
 
@@ -1826,7 +1830,7 @@ Alias of `get_vulnerability_history`.
 clear_attack_pattern_history() -> ()
 ```
 
-Alias of `clear_vulnerability_history`.
+Canonical name; `clear_vulnerability_history` is its legacy alias.
 
 #### reset_attack_pattern_suppressions
 
@@ -1834,7 +1838,7 @@ Alias of `clear_vulnerability_history`.
 reset_attack_pattern_suppressions() -> String
 ```
 
-Alias of `reset_vulnerability_suppressions`.
+Canonical name; `reset_vulnerability_suppressions` is its legacy alias.
 
 #### get_attack_pattern_debug_trace
 
@@ -1842,7 +1846,7 @@ Alias of `reset_vulnerability_suppressions`.
 get_attack_pattern_debug_trace(report_id: String) -> String
 ```
 
-Alias of `get_vulnerability_debug_trace`.
+Canonical name; `get_vulnerability_debug_trace` is its legacy alias.
 
 #### get_attack_pattern_detector_status
 
@@ -1850,7 +1854,7 @@ Alias of `get_vulnerability_debug_trace`.
 get_attack_pattern_detector_status() -> String
 ```
 
-Alias of `get_vulnerability_detector_status`.
+Canonical name; `get_vulnerability_detector_status` is its legacy alias.
 
 #### debug_run_attack_pattern_detector_tick
 
@@ -1858,7 +1862,7 @@ Alias of `get_vulnerability_detector_status`.
 debug_run_attack_pattern_detector_tick() -> String
 ```
 
-Alias of `debug_run_vulnerability_detector_tick`.
+Canonical name; `debug_run_vulnerability_detector_tick` is its legacy alias.
 
 #### export_attack_pattern_finding_details
 
@@ -1915,7 +1919,7 @@ The single entry point for adding a dismissal rule (the lower-level `agentic_add
 agentic_report_dismissal(request_json: String) -> String
 ```
 
-Operator-initiated, opt-in report of a vulnerability or divergence dismissal to the EDAMAME backend. Mirrors the device-feedback `dislike_device_type` shape: this RPC does NOT change local policy (the dismissal rule is already applied via `agentic_dismiss_with_scope` before this is called) -- it only sends the operator's feedback. Carries the matcher fields, the dismissal scope/severity ceiling/TTL, agent identity, and an optional consent note + email. The core attaches, from its own history, what the adjudicator saw and said about the finding (`adjudication`: detector report id, decision source, per-finding model verdict and reasoning, pre-adjudication severity, guardrail tier, detection basis, and the `FindingEvidence` packet and CRS score as JSON), so every reported dismissal is stored as a (features, model verdict, human verdict) row; callers pass nothing extra for it. Returns `{ "success": bool, "error"?: string }`.
+Operator-initiated, opt-in report of a vulnerability or divergence dismissal to the EDAMAME backend. Mirrors the device-feedback `dislike_device_type` shape: this RPC does NOT change local policy (the dismissal rule is already applied via `agentic_dismiss_with_scope` before this is called) -- it only sends the operator's feedback. Carries the matcher fields, the dismissal scope/severity ceiling/TTL, agent identity, and an optional consent note + email. The core attaches, from its own history, what the adjudicator saw and said about the finding (`adjudication`: detector report id, decision source, per-finding model verdict and reasoning, pre-adjudication severity, guardrail tier, detection basis, and the `FindingEvidence` packet and CRS score as JSON), so every reported dismissal is stored as a (features, model verdict, human verdict) row; callers pass nothing extra for it. Returns `{ "success": bool, "error"?: string }`. Since 2.0 the EDAMAME Portal is the only destination (the Hub e-mail copy is gone) and the call is no longer best-effort: it returns `{"success": false, "error": ...}` when the Portal post fails or when the device has no Portal identity (an EDAMAME API key, or a Portal sign-in with valid tokens) -- an own model alone gives none, so the app offers the report only with a Portal identity. The local dismissal stays applied either way.
 
 #### agentic_remove_dismissal_rule
 
@@ -2325,6 +2329,14 @@ refresh_agent_visibility() -> String
 ```
 
 Force a structural visibility recollection (MCP discovery + component inventory + capability graph). Returns a `{"success": bool, ...}` envelope; on success carries `endpoint_count`, `finding_count`, `component_inventory_count`, and `graph_edge_count`. Most callers can rely on the lazy `ensure_*` refresh in the read RPCs instead of calling this explicitly.
+
+### agentic_approve_mcp_tool_baseline
+
+```
+agentic_approve_mcp_tool_baseline(endpoint_key: String) -> String
+```
+
+Accept the current tool definitions of one MCP server (`endpoint_key` = `<agent_type>|<server_name>`) as the approved baseline, which clears its `mcp_tool_definition_changed` finding (the rug-pull shape: a server now advertising a different tool surface than the one approved) and the `mcp_risk` threat it raises; the structural visibility pass re-runs at once. Fallible envelope `{"success": bool, "error": "..."}` (unknown key: refresh agent visibility first). Operator control plane only: never an MCP tool (listed in `FORBIDDEN_MCP_MUTATORS`, since the observed agent must not approve its own rug pull) and not on the Flutter bridge; call it through `edamame_cli rpc`. Retired in 2.0 as caller-less and restored before release: without it a changed server kept its finding for good.
 
 ### get_visibility_summary
 
