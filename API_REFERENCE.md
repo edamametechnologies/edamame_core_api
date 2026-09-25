@@ -1423,7 +1423,7 @@ Returns the EDAMAME Portal URL.
 agentic_clear_action_history() -> bool
 ```
 
-Clear all action history records.
+Clear the Assistant's action records (the app's AI History "Clear actions"). Attack-pattern and divergence findings are kept: they have their own clears (`clear_vulnerability_history` / `clear_attack_pattern_history`, `clear_divergence_history`). Since 2.0 core also clears the Assistant's records by itself when the model is disconnected (a Portal sign-out, an own model cleared, provider `none`: a config that could call a model and no longer can); switching to another working model keeps them.
 
 ### Action Management
 
