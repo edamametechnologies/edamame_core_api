@@ -23,6 +23,7 @@ Methods are organized by API domain. Health-related methods are omitted from thi
 - [Health](#health)
 - [File Integrity Monitoring (FIM)](#file-integrity-monitoring-fim)
 - [Privacy](#privacy)
+- [Managed Configuration](#managed-configuration)
 - [Agent Visibility](#agent-visibility)
 - [MCP Server](#mcp-server)
 - [Test Utilities](#test-utilities)
@@ -2309,6 +2310,32 @@ get_consent_document(document: String, locale: String) -> String
 ```
 
 Return operator-facing consent markdown. Tries `raw.githubusercontent.com/edamametechnologies/threatmodels/{branch}/consent/` first, then the snapshot embedded by `edamame_foundation/update-threats.sh`. `document` is one of `compliance-scanner`, `user-feedback`, `profiling-feedback`, `request-report`, `vulnerability-feedback`, `privacy-LLM`, `privacy-detailed`, `privacy-detailed-ai`. `locale` is `EN` or `FR` (anything else falls back to English). Unknown ids return an empty string.
+
+---
+
+## Managed Configuration
+
+Organization-managed (MDM) configuration of the EDAMAME Security app, 2.0.2. The organization sets it through the OS -- macOS configuration profile (forced managed preferences of `com.edamametechnologies.edamame`), Windows `HKLM\SOFTWARE\Policies\EDAMAME\EDAMAME Security` -- plus a root/SYSTEM-only `secrets.json` (Hub PIN, LLM / Portal key) read by the EDAMAME Helper. There is no RPC or MCP setter. Key schema and deployment: the public `auto_provisioning` repository (`docs/app-configuration.md`).
+
+Only the runtime owner (the app, the posture daemon) applies a policy: about 5 s after start, every 15 minutes, when the helper becomes usable, and on `reload_managed_configuration`. Locked values make the operator mutators refuse a change away from the policy with an error starting with `managed:` -- `agentic_set_protection`, `agentic_set_auto_processing`, `start_attack_pattern_detector` / `start_divergence_engine` (JSON envelope `{"success": false, "error": "managed: ..."}`), `agentic_set_llm_config` / `agentic_set_edamame_api_key` (return `false`), and the `-> ()` mutators `set_credentials`, `disconnect_domain`, `start_capture` / `stop_capture`, `start_file_monitor` / `stop_file_monitor`, `set_export_ai_failure_details` (logged no-op). Neither RPC below is an MCP tool.
+
+**Source**: `api/api_managed.rs`
+
+### get_managed_configuration_status
+
+```
+get_managed_configuration_status() -> ManagedConfigurationStatusAPI
+```
+
+What the organization manages, read fresh from the OS policy store: `managed`, `organization_name`, `policy_source` (`configuration_profile` / `group_policy` / `unsupported`), `secrets_status` (`loaded`, `absent`, `invalid`, `insecure_permissions`, `unreadable`, `unsupported`, `unavailable` = helper not reachable, `not_read`), `managed_keys`, the managed values (`hub_email`, `llm_provider`, `llm_model`, `llm_base_url`, `protection_enabled`, `assistant_level`, `network_monitoring_consent`, `share_ai_failure_details`, `capture_enabled`, `file_monitor_enabled`, `hide_ai_settings`), the locks (`hub_enrollment_locked`, `llm_locked`, `protection_locked`, `monitoring_locked`), `has_hub_pin` / `has_llm_api_key` (presence only, never the secret), `errors` (last apply and parse problems) and `last_applied` (RFC 3339).
+
+### reload_managed_configuration
+
+```
+reload_managed_configuration() -> ()
+```
+
+Re-read the policy and the secrets file and apply them now (runtime owner only; a no-op in a CLI one-shot core).
 
 ---
 
