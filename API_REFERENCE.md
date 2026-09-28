@@ -1059,6 +1059,14 @@ request_pin() -> ()
 
 Request a new PIN for domain authentication.
 
+### enroll_with_token
+
+```
+enroll_with_token(user: String, domain: String, token: String) -> String
+```
+
+Enroll this device in the Hub for `user@domain` with a domain enrollment token created by a Hub admin (MDM deployment without the user's PIN), then connect. The Hub exchanges the token for a per-device credential that replaces the PIN on score reports; the token (until exchanged) and the credential are kept in the OS secret store and never logged. Idempotent: a device already enrolled for `user@domain` connects without using the token again. Returns `{"success": true}` or `{"success": false, "error": "..."}`; a refused token (unknown, revoked, expired, used up) is dropped, a network failure keeps it and the exchange is retried on the next connection. Operator plane only (not an MCP tool).
+
 ### get_connection
 
 ```
