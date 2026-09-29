@@ -536,7 +536,7 @@ Returns sessions matching blacklist rules.
 get_whitelist_exceptions() -> Vec<SessionInfoAPI>
 ```
 
-Returns sessions that violate the active whitelist.
+Returns sessions that violate the active whitelist. Empty when the capture is not running.
 
 #### get_whitelist_conformance
 
@@ -544,7 +544,7 @@ Returns sessions that violate the active whitelist.
 get_whitelist_conformance() -> bool
 ```
 
-Returns true if all current traffic conforms to the active whitelist.
+Returns true if all current egress traffic conforms to the active whitelist (true as well when no whitelist is active: `get_whitelist_name` is empty). Fails closed: `false` when conformance cannot be certified, that is when the capture is not running, the helper is not enabled or does not answer.
 
 #### get_anomalous_status
 
@@ -567,18 +567,36 @@ Returns true if any blacklisted sessions have been detected.
 #### set_whitelist
 
 ```
-set_whitelist(whitelist_name: String) -> ()
+set_whitelist(whitelist_name: String) -> String
 ```
 
-Set the active whitelist by name (from the threat models repository).
+Set the active whitelist by name (from the threat models repository; empty turns whitelist evaluation off). Returns `{"success": true}` or `{"success": false, "error": "..."}`. An unknown name fails closed: it is still what gets enforced, so every egress session is non-conforming, and the error lists the names that exist. No capture to set it on (helper not enabled or not answering) is an error too.
 
 #### set_custom_whitelists
 
 ```
-set_custom_whitelists(whitelist_json: String) -> ()
+set_custom_whitelists(whitelist_json: String) -> String
 ```
 
-Set custom whitelist rules from JSON.
+Load custom whitelist rules from JSON as `custom_whitelist` (an empty string drops the custom whitelist). Returns `{"success": true}` or `{"success": false, "error": "..."}`. The JSON is checked before anything changes: malformed JSON, an unknown field, no whitelist named `custom_whitelist`, or an `extends` parent the JSON does not define is refused with the reason, and the whitelist already active stays.
+
+Matching is domain first: a session whose destination has a name (DNS answer or TLS SNI; a reverse-DNS name built from the address does not count) matches an entry with domains only by name, the entry's addresses standing in for sessions without a name. An address-only entry does not cover a named destination on shared infrastructure (CDN and cloud front-end AS owners). An entry with `"unresolved_only": true` matches sessions without a name only.
+
+#### evaluate_custom_whitelists
+
+```
+evaluate_custom_whitelists(whitelist_json: String, since: String) -> String
+```
+
+Check the observed egress sessions against a whitelist JSON the caller holds, not the one the capture has loaded (a CI job is judged by its own list whatever another job or a build step loaded into a shared daemon). `since` (RFC 3339, or empty for every session) keeps the sessions active at or after it. Returns `{"success": true, "whitelist": "custom_whitelist", "since": "...", "evaluated": N, "conforming": N, "non_conforming": [{"protocol", "src_ip", "src_port", "dst_ip", "dst_port", "dst_domain", "as_number", "as_owner", "process", "last_activity", "reason"}]}`, or `{"success": false, "error": "..."}` when the JSON does not load, `since` is not RFC 3339, or the capture is not running (nothing observed is not conformance). Used by `edamame_posture evaluate-custom-whitelists-from-file`.
+
+#### augment_custom_whitelists_from
+
+```
+augment_custom_whitelists_from(whitelist_json: String, since: String) -> String
+```
+
+Learn on top of a whitelist JSON the caller holds (not the capture's live whitelist): every observed egress session (active at or after `since`, when given) that does not conform to it becomes an entry, and the result is factorized; the given entries are kept as they are (process bindings and `extends` included). Returns `{"success": true, "whitelist": {...}, "added": [entries], "evaluated": N, "non_conforming": N}`, or `{"success": false, "error": "..."}` as for `evaluate_custom_whitelists`. Learned entries follow the matching rules: a named destination becomes a domain entry, its address kept only off shared infrastructure; unnamed traffic to shared infrastructure becomes an `unresolved_only` entry for its AS; other unnamed traffic an address entry. Used by `edamame_posture augment-custom-whitelists-from-file`.
 
 #### augment_custom_whitelists
 
@@ -610,7 +628,7 @@ Merge two whitelists into one. Returns combined JSON.
 compare_custom_whitelists(whitelist1_json: String, whitelist2_json: String) -> f64
 ```
 
-Compare two whitelists and return a similarity score (0.0 to 1.0).
+Compare two whitelists: the percentage (0.0 to 100.0) of the second whitelist's entries that allow something the first one's entries do not. Entries compare on what they allow (domains, or addresses and network for entries without a domain, plus ports, protocol and process): a new address on a known domain or a new description is not a change; removals are not counted. Returns 0.0 when either JSON does not parse: check them first (`edamame_posture compare-custom-whitelists-from-files` does).
 
 #### create_custom_whitelists
 
@@ -634,7 +652,7 @@ Generate a whitelist from captured traffic, including process attribution.
 create_and_set_custom_whitelist() -> ()
 ```
 
-Generate and immediately activate a whitelist from current traffic.
+Generate and immediately activate a whitelist from current traffic. When nothing is generated, the active whitelist stays.
 
 #### set_custom_blacklists
 
