@@ -1219,6 +1219,8 @@ Since 2.0 each `AdvisorTodoAPI` carries `agentic_action`: the assistant's latest
 | `success` | Whether the recorded action succeeded |
 | `undo_available` | Whether the action can still be undone |
 
+Since 2.0.3 each `AdvisorTodoAPI` also carries `needs_operator` (bool): `true` when no automation can fix the todo, only the operator, because the assistant's pass never takes it (a failed policy, a setup item, a threat whose model declares no remediation order). Set only while the assistant's verdicts are live, like `agentic_action`; otherwise `false` (and always `false` on builds without the `agentic` feature). The app's Security radar labels these todos "Needs you".
+
 ## Security AI (agentic RPCs)
 
 AI-powered security automation with support for multiple LLM providers. Requires the `agentic` feature flag.
