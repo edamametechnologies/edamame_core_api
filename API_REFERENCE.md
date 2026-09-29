@@ -1034,7 +1034,7 @@ Domain connection, policy enforcement, PIN authentication, and compliance report
 set_credentials(user: String, domain: String, pin: String) -> ()
 ```
 
-Set credentials for connecting to a managed domain (EDAMAME Hub).
+Set credentials for connecting to a managed domain (EDAMAME Hub). Credentials sent before a `disconnect_domain` that is saved first are dropped; credentials sent after it apply.
 
 ### connect_domain
 
@@ -1042,7 +1042,7 @@ Set credentials for connecting to a managed domain (EDAMAME Hub).
 connect_domain() -> ()
 ```
 
-Connect to the configured managed domain. Begins continuous security reporting.
+Connect to the configured managed domain. Begins continuous security reporting. A connection still in progress when a `disconnect_domain` is saved does not connect.
 
 ### disconnect_domain
 
@@ -1050,7 +1050,7 @@ Connect to the configured managed domain. Begins continuous security reporting.
 disconnect_domain() -> ()
 ```
 
-Disconnect from the managed domain.
+Sign out of the managed domain: the device is disconnected and its account (user, domain, PIN) cleared, both saved before the call returns. The final "disconnect" report to the Hub is sent in the background, bounded (90 s), and not at all when the same account has connected again first. Refused (logged no-op) while an organization's policy locks the Hub account.
 
 ### request_pin
 

@@ -711,7 +711,7 @@ Domain connection, policy enforcement, and compliance reporting.
 |--------|-----------|---------|-------------|
 | `set_credentials` | user, domain, pin | void | Set domain credentials |
 | `connect_domain` | -- | void | Connect to managed domain |
-| `disconnect_domain` | -- | void | Disconnect from domain |
+| `disconnect_domain` | -- | void | Sign out of the domain (account cleared) |
 | `request_pin` | -- | void | Request domain PIN |
 | `get_connection` | -- | ConnectionStatusAPI | Connection status |
 | `get_last_report_secs` | -- | i64 | Seconds since last report |
