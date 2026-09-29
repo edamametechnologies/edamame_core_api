@@ -386,7 +386,7 @@ Model-independent heuristic checks (CVE-aligned). Run on their own cadence, inde
 
 ### `get_vulnerability_findings`
 
-Get the latest vulnerability findings from model-independent heuristic checks. Returns timestamped report with `findings` array; each finding has `check`, `severity` (CRITICAL/HIGH/MEDIUM/LOW), `description`, `reference` (CVE IDs or incident ref), `process_name`, `parent_process_name`, `destination_ip`, `open_files`, `finding_key`, `dismissed`, and -- when a dismissal rule currently covers the finding -- `dismissed_by_rule` (the rule id; absent on non-dismissed findings and on Finding-scope sticky dismissals with no matching rule).
+Get the latest vulnerability findings from model-independent heuristic checks. Returns timestamped report with `findings` array; each finding has `check`, `severity` (CRITICAL/HIGH/MEDIUM/LOW), `description`, `reference` (CVE IDs or incident ref), `process_name`, `parent_process_name`, `destination_ip`, `open_files`, `finding_key`, `dismissed`, `first_detected` (since 2.0.3: when the history first recorded the finding, RFC 3339 UTC, kept across re-detections), and -- when a dismissal rule currently covers the finding -- `dismissed_by_rule` (the rule id; absent on non-dismissed findings and on Finding-scope sticky dismissals with no matching rule).
 
 **Parameters**: None
 

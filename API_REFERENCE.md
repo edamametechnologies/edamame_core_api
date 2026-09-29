@@ -1823,7 +1823,9 @@ Canonical name of `set_vulnerability_adjudication_mode` (same modes `llm` / `adv
 get_attack_pattern_findings() -> String
 ```
 
-Canonical name; `get_vulnerability_findings` is its legacy alias.
+Canonical name; `get_vulnerability_findings` is its legacy alias. Returns the latest report as JSON (`{"findings": null}` when there is none): `report_id`, `timestamp` (the earliest first detection of the report's newest group), `findings`, `decision_source`, `llm_decision`, `human_alert`, `trace_available`. The findings are the newest group plus every active finding carried forward from history until it is dismissed.
+
+Each finding carries `finding_key`, `check`, `severity`, `description`, `reference`, `dismissed`, `dismissed_by_rule`, the process and destination fields, `open_files`, `detection_basis`, `subject_path`, `evidence` / `evidence_score` when present, and, since 2.0.3, `first_detected`: when the history first recorded that finding, RFC 3339 UTC (`"2026-09-28T17:57:03.418Z"`, fraction optional). It is the record's first detection, kept across re-detections, carry-forward and restarts, so it tells a finding first seen during a CI job from one an earlier job left active on a persistent runner (`edamame_posture attack-pattern-status --fail-on-findings --since <RFC 3339>`, `edamame_posture_action`'s job-scoped gate). Every finding this method returns has one; a daemon before 2.0.3 omits the field.
 
 #### get_attack_pattern_history
 
@@ -1831,7 +1833,7 @@ Canonical name; `get_vulnerability_findings` is its legacy alias.
 get_attack_pattern_history(limit: usize) -> String
 ```
 
-Canonical name; `get_vulnerability_history` is its legacy alias.
+Canonical name; `get_vulnerability_history` is its legacy alias. Each report's findings carry the same per-finding `first_detected` as `get_attack_pattern_findings` (since 2.0.3).
 
 #### clear_attack_pattern_history
 
