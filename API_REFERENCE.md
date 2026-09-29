@@ -136,6 +136,23 @@ get_helper_state() -> String
 
 Returns the current state of the helper daemon (active, inactive, etc.).
 
+### get_model_authenticity_status
+
+```
+get_model_authenticity_status() -> ModelAuthenticityStatusAPI
+```
+
+Read-only (2.0.3). Threat-model signatures: every process that downloads a model from the threatmodels repository checks it against an Ed25519-signed manifest before loading it (feature `model-signatures`, on in every shipped build). A download that does not verify is never loaded: the model keeps its embedded snapshot or its last verified download.
+
+- `local`: this process (the app's core, posture or the cli), a `ModelAuthenticitySnapshotAPI`:
+  - `enforced`: downloads are verified.
+  - `exec_sequence` / `data_sequence`: highest manifest sequence accepted per scope; the embedded rollback floor until a newer manifest verifies, 0 when not enforced.
+  - `models`: the models the process initialized (the threat model is always listed), each with `file_name`, `scope` (`exec` for `threatmodel-*.json`, whose scripts run; `data` for everything else), `provenance` (`embedded`, `custom` = set locally, `downloaded` = not authenticated, `downloaded_verified`) and `last_authenticity_error` (why the last download was refused, empty when it was not).
+- `helper`: the same snapshot from the helper, which runs the elevated threat-model scripts from its own copy and refreshes its capture lists itself; present when a helper of `first_verifying_helper_version` or later answered.
+- `helper_verification`: `not_applicable` (no helper: standalone, iOS, Android), `unknown` (the helper has not answered), `verifying`, or `not_verifying` (the helper predates verification and runs whatever the repository serves; the app then shows the `helper_unverified_models` notification).
+- `helper_version`: the helper's version, empty when unknown.
+- `first_verifying_helper_version`: `2.0.3`.
+
 ### get_helper_url
 
 ```
@@ -1426,7 +1443,7 @@ Returns a JSON snapshot of in-memory cache sizes for the agentic subsystem (acti
 get_agentic_notification_history(limit: usize) -> String
 ```
 
-Returns the last `limit` notifications core authored as a JSON array, most recent first. Each entry is `{notification_id, timestamp, source, severity, title, body, route, section, arguments}`: `source` is the message kind (`vulnerability_alert`, `divergence_alert`, `action_report`, ... plus, since 2.0, the system-plane kinds `score_increased`, `score_decreased`, `anomalous_sessions`, `blacklisted_sessions`, `new_devices`, `policy_compliance`, `identity_breaches`, `helper_outdated`, `app_outdated`, `backend_outdated`, `domain_limit`, `subscription_limit`), `section` is the rail section whose notification toggle applies (`Security`, `Agents`, `Threats`, `Identity`, `Network`, `System`, `Trust`, `General`), `route` plus `arguments` (all strings, including `tab` and every localizable value) form the deep link, and `title` / `body` are the English fallback. The app renders from this list and deduplicates on `notification_id`; it composes no notification of its own since 2.0.
+Returns the last `limit` notifications core authored as a JSON array, most recent first. Each entry is `{notification_id, timestamp, source, severity, title, body, route, section, arguments}`: `source` is the message kind (`vulnerability_alert`, `divergence_alert`, `action_report`, ... plus, since 2.0, the system-plane kinds `score_increased`, `score_decreased`, `anomalous_sessions`, `blacklisted_sessions`, `new_devices`, `policy_compliance`, `identity_breaches`, `helper_outdated`, `app_outdated`, `backend_outdated`, `domain_limit`, `subscription_limit`, and since 2.0.3 `helper_unverified_models`), `section` is the rail section whose notification toggle applies (`Security`, `Agents`, `Threats`, `Identity`, `Network`, `System`, `Trust`, `General`), `route` plus `arguments` (all strings, including `tab` and every localizable value) form the deep link, and `title` / `body` are the English fallback. The app renders from this list and deduplicates on `notification_id`; it composes no notification of its own since 2.0.
 
 #### agentic_get_subscription_status
 
