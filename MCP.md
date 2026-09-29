@@ -2,10 +2,11 @@
 
 Complete reference for all MCP (Model Context Protocol) tools exposed by EDAMAME Core. These tools are available to external AI assistants (Claude Desktop, n8n, custom agents) via the MCP server.
 
-**Server**: Streamable HTTP transport via [rmcp](https://github.com/nicholaskell/rmcp) SDK v0.8
-**Protocol**: MCP 2024-11-05
+**Server**: Streamable HTTP transport via [rmcp](https://github.com/modelcontextprotocol/rust-sdk) SDK 2.x (since 2.0.3; 0.8 before)
+**Protocol**: negotiated at `initialize`: the server answers the version the client asks for when rmcp knows it (2024-11-05 through 2026-07-28), otherwise 2025-11-25. Before 2.0.3 it always answered 2024-11-05.
 **Default endpoint**: `http://127.0.0.1:3000/mcp`
 **Authentication**: Dual-mode (per-client credentials or shared PSK) via `Authorization: Bearer <token>` header
+**Transport security and sessions**: see [Transport Security and Sessions](#transport-security-and-sessions)
 
 **Retired 1.7.0:** Tool-call firewall MCP tools (`get_firewall_status`,
 `get_firewall_evaluations`), ADR response-action reads (`get_response_action_*`),
@@ -795,6 +796,15 @@ PSK generation: `edamame-posture mcp-generate-psk`
 | Bind address | 127.0.0.1 | Use `listen_all_interfaces` for 0.0.0.0 |
 | CORS | Disabled | Enable for browser-based clients |
 | HTTPS | Disabled | Available for production deployments |
+
+### Transport Security and Sessions
+
+These rules apply since 2.0.3 (rmcp 2.x):
+
+- **Host and Origin checks (DNS rebinding).** Every route (`/mcp`, `/mcp/pair`, `/mcp/pair/{id}`, `/health`, `/`) answers HTTP 403 to a request whose `Host` is not `localhost`, `127.0.0.1` or `[::1]`, before authentication. With `listen_all_interfaces` the server also accepts an IP address and this machine's host name (and `<name>.local`): address it by one of those, not by another DNS alias. A request that carries an `Origin` header (a browser) must come from the server's own origin, `http://<accepted host>:<port>`, unless CORS is enabled.
+- **Sessions.** `initialize` returns an `Mcp-Session-Id` header; send it on every later request. A session idle for 30 minutes is closed. A request naming an unknown or closed session gets HTTP 404 (401 before 2.0.3): send `initialize` again. A POST without a session that is not an `initialize` gets HTTP 422 and allocates nothing.
+- **Argument errors.** A `tools/call` whose arguments do not fit the tool's input schema returns a result with `isError: true` and the text `failed to deserialize parameters: ...` (a JSON-RPC `-32602` error before 2.0.3). An unknown tool name is still a JSON-RPC error.
+- **Input schemas** are JSON Schema 2020-12 (draft-07 before 2.0.3). They no longer carry the Rust argument type's `title` and `description` at the top level, and an optional field is typed `["integer", "null"]` instead of carrying `nullable: true`. Property names, types, defaults and required fields are unchanged.
 
 ### Quick Start
 
