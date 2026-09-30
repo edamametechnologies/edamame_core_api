@@ -2128,7 +2128,7 @@ On-demand, guardrailed LLM coaching over the deterministic augmentation aggregat
 generate_augmentation_coach_insight(kind: String, window_minutes: u64, agent_type: String, workspace_slug: String) -> String
 ```
 
-Generate (or return a cached) one coach insight for a template `kind` over the scoped aggregate. `window_minutes` / `agent_type` / `workspace_slug` scope the aggregate exactly like `get_self_augmentation_report` (empty strings = all, `0` = 24h default). Fallible envelope: `{"success": true, "cache_hit": bool, "insight": {...CoachInsightRecord...}}` on success (the UI renders `insight.envelope` and badges `insight.transport`), `{"success": false, "error": "..."}` on failure (unknown `kind`, no LLM transport configured, LLM call failed, or the produced envelope was rejected by the validator).
+Generate (or return a cached) one coach insight for a template `kind` over the scoped aggregate. `window_minutes` / `agent_type` / `workspace_slug` scope the aggregate exactly like `get_self_augmentation_report` (empty strings = all, `0` = 24h default). Since 2.0.3 the user's own agent writes the insight first: each detected agent CLI (Claude Code, Codex, Cursor) in turn, read-only and ephemeral, so the agent reviews its own setup; the configured AI provider (EDAMAME Portal or the user's key) answers only when no CLI is installed or none answers. Fallible envelope: `{"success": true, "cache_hit": bool, "insight": {...CoachInsightRecord...}}` on success (the UI renders `insight.envelope` and badges `insight.transport`: `agent_cli:<agent>` | `portal` | `byo:<provider>`), `{"success": false, "error": "..."}` on failure (unknown `kind`, no transport available, every transport failed, or the produced envelope was rejected by the validator). A cached insight is returned while its transport is still available.
 
 #### get_augmentation_coach_insights
 
@@ -2144,7 +2144,7 @@ Return all cached coach insights as a JSON array of `CoachInsightRecord`. Read-o
 get_coach_transport_status() -> String
 ```
 
-Return coach transport availability as JSON `CoachTransportStatus`: which LLM provider is configured, whether it is usable right now, and the transport label generation would use — so the UI can badge what "Coach me" will do before the user taps it. Read-only.
+Return coach transport availability as JSON `CoachTransportStatus`: which LLM provider is configured, whether it is usable right now, the detected agent CLIs in the order the coach tries them, and the transport generation tries first (`agent_cli:<agent>` when a CLI is detected, else `portal` / `byo:<provider>`, else `none`) — so the UI can badge what "Coach me" will do before the user taps it. On the app build, detection goes through the EDAMAME Helper: without it no CLI is detected. Read-only.
 
 ### In-Agent Fix Runs
 
