@@ -1007,6 +1007,32 @@ and `unchanged` meaning it was already absent. `tracked` is `false` on success a
 `null` otherwise — notably, a `demo_mode_no_op` refusal leaves the address
 monitored, so reporting `false` would be wrong.
 
+### get_pwned_email_proposals
+
+```
+get_pwned_email_proposals() -> Vec<String>
+```
+
+The accounts detected on this device (the Apple ID on macOS, the Windows
+account email) that EDAMAME offers to monitor for breaches. Since 2.0.3 a
+detected account is never monitored on its own: the user confirms it with
+`add_pwned_email` (it is then monitored like any address the user added) or
+declines it with `decline_pwned_email_proposal`. An address already monitored,
+or declined, is not offered. Empty in demo mode.
+
+### decline_pwned_email_proposal
+
+```
+decline_pwned_email_proposal(email: String) -> String
+```
+
+Declines a detected account offered by `get_pwned_email_proposals`: it is not
+offered again (the decline is saved). Same envelope and `outcome` vocabulary as
+`add_pwned_email`, with `changed` meaning the address was offered and now is
+declined, and `unchanged` meaning it was not offered. `tracked` is `false` on
+success. Removing a confirmed detected account with `remove_pwned_email` also
+declines it. Operator-only: not exposed as an MCP tool.
+
 ### get_breaches_for_email
 
 ```
