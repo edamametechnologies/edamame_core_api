@@ -1963,7 +1963,7 @@ Export a neutral, consumer-agnostic diagnostic record for a single attack-patter
 }
 ```
 
-On failure, returns `{ "success": false, "error": "..." }`. The `debug_trace` field carries the full `VulnerabilityDebugTrace` (including the `input_snapshot` used for replay) when the daemon was started with `set_keep_history_debug_traces { keep: true }`, and `null` otherwise.
+On failure, returns `{ "success": false, "error": "..." }`. The `debug_trace` field carries the full `VulnerabilityDebugTrace` (including the `input_snapshot` used for replay) while the report's trace is still kept: traces are kept by default and dropped when the daemon runs with `EDAMAME_DISABLE_DEBUG_TRACES=1`; it is `null` when no trace is kept for that report.
 
 This RPC is consumer-neutral by design. Known consumers:
 
