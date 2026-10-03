@@ -2392,7 +2392,7 @@ Only the runtime owner (the app, the posture daemon) applies a policy: about 5 s
 get_managed_configuration_status() -> ManagedConfigurationStatusAPI
 ```
 
-What the organization manages, read fresh from the OS policy store: `managed`, `organization_name`, `policy_source` (`configuration_profile` / `group_policy` / `unsupported`), `secrets_status` (`loaded`, `absent`, `invalid`, `insecure_permissions`, `unreadable`, `unsupported`, `unavailable` = helper not reachable, `not_read`), `managed_keys`, the managed values (`hub_email`, `llm_provider`, `llm_model`, `llm_base_url`, `protection_enabled`, `assistant_level`, `network_monitoring_consent`, `share_ai_failure_details`, `capture_enabled`, `file_monitor_enabled`, `hide_ai_settings`), the locks (`hub_enrollment_locked`, `llm_locked`, `protection_locked`, `monitoring_locked`), `has_hub_pin` / `has_llm_api_key` (presence only, never the secret), `errors` (last apply and parse problems) and `last_applied` (RFC 3339).
+What the organization manages, read fresh from the OS policy store and merged with the accepted Hub-managed configuration (below): `managed`, `organization_name`, `policy_source` (`configuration_profile` / `group_policy` / `unsupported`), `secrets_status` (`loaded`, `absent`, `invalid`, `insecure_permissions`, `unreadable`, `unsupported`, `unavailable` = helper not reachable, `not_read`), `managed_keys`, the managed values (`hub_email`, `llm_provider`, `llm_model`, `llm_base_url`, `protection_enabled`, `assistant_level`, `network_monitoring_consent`, `share_ai_failure_details`, `capture_enabled`, `file_monitor_enabled`, `lan_auto_scan` (2.0.5), `hide_ai_settings`), the locks (`hub_enrollment_locked`, `llm_locked`, `protection_locked`, `monitoring_locked`), `has_hub_pin` / `has_llm_api_key` (presence only, never the secret), `errors` (last apply and parse problems), `last_applied` (RFC 3339) and `hub_configuration_applied` (2.0.5: an accepted Hub-managed configuration is part of these values).
 
 ### reload_managed_configuration
 
@@ -2401,6 +2401,34 @@ reload_managed_configuration() -> ()
 ```
 
 Re-read the policy and the secrets file and apply them now (runtime owner only; a no-op in a CLI one-shot core).
+
+### Hub-managed configuration (2.0.5)
+
+The Hub returns, with each score report, the settings a domain manages, one configuration per target (`app`, `cicd`, `posture`); core keeps the one for this device. Nothing is applied until the user accepted it in the app (each element through the consent screen it has when the user turns it on) or the posture operator opted in (`--accept-managed-config`). An accepted configuration is merged with the OS policy (an OS-locked group wins, the Hub wins over unlocked OS defaults) and applied through the same pipeline, locks included. A changed configuration is asked about again; the previously accepted one stays applied meanwhile. Each score report tells the Hub the answer (`managed_configuration`: target, fingerprint, state, Portal enrollment, errors). None of the three RPCs is an MCP tool.
+
+### get_hub_managed_configuration
+
+```
+get_hub_managed_configuration() -> HubManagedConfigurationAPI
+```
+
+`state` (`none`, `pending`, `accepted`, `declined`), `target`, `domain`, `organization_name`, `required` (refusing leaves the domain), `fingerprint` and `revision` of the configuration to answer (pending) or in force (accepted), `accepted_fingerprint` (still applied while a newer one waits), `elements` (`key`, `value`, `locked` by the domain, `os_locked` by the device's own policy, `will_change`, `consent`: the screen to show before turning it on -- `lan_scan`, `ai_failure_details`, `portal`, `assistant_auto`, or none of its own), `portal_enrolled`, `errors`, `updated_at`. Never the Portal enrollment token.
+
+### accept_hub_managed_configuration
+
+```
+accept_hub_managed_configuration(fingerprint: String) -> String
+```
+
+Accept the pending configuration the user reviewed. `fingerprint` is the one shown: an answer to a configuration that changed since is refused. Exchanges the Portal enrollment token for the Portal key when the configuration provisions one, then applies. Returns `{"success": true, "left_domain": false}` or `{"success": false, "error": "..."}`.
+
+### decline_hub_managed_configuration
+
+```
+decline_hub_managed_configuration(fingerprint: String) -> String
+```
+
+Decline the pending configuration: a previously accepted one stops being enforced (values stay as they are). Declining a `required` configuration disconnects the device from the domain (`"left_domain": true`), unless the device's own policy locks the Hub enrollment, which is refused. Same envelope as `accept_hub_managed_configuration`.
 
 ---
 

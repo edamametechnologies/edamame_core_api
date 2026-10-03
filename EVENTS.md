@@ -177,6 +177,12 @@ self.state.read().await.event_manager.trigger_event(CoreEvent::ScoreCompleted);
 |-------|-------|-------------|
 | `FileEventsUpdated` | 281474976710656 | File integrity monitoring (FIM) events updated |
 
+### Managed Configuration Events
+
+| Event | Value | Description |
+|-------|-------|-------------|
+| `HubManagedConfigurationChanged` | 36893488147419103232 | The domain's Hub-managed configuration was received, answered or retired (2.0.5); read it with `get_hub_managed_configuration` |
+
 ## Event Mask Examples
 
 Common event mask patterns:
