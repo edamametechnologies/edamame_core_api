@@ -1938,6 +1938,45 @@ debug_run_attack_pattern_detector_tick() -> String
 
 Canonical name; `debug_run_vulnerability_detector_tick` is its legacy alias.
 
+#### debug_get_process_lineage
+
+```
+debug_get_process_lineage(pid: u32) -> String
+```
+
+Operator probe (2.0.5): the kernel process lineage the attack-pattern detector holds for one pid, from the kernel process-event stream (Endpoint Security on macOS, eBPF on Linux, ETW on Windows), plus the stream's health counters. Read-only; not an MCP tool. Detector ticks feed the lineage table, so call `debug_run_attack_pattern_detector_tick` first for a process that started after the last tick.
+
+```json
+{
+  "success": true,
+  "pid": 4002,
+  "found": true,
+  "kernel_exec": {
+    "image_path": "/path/to/edl_c",
+    "process_name": "edl_c",
+    "ppid": 4001,
+    "parent_image_path": "/path/to/edl_p",
+    "ancestry": [
+      { "pid": 4001, "image_path": "/path/to/edl_p", "process_name": "edl_p" },
+      { "pid": 4000, "image_path": "/usr/bin/python3", "process_name": "python3" }
+    ],
+    "agent_ancestor": null,
+    "lineage_suspicious": false
+  },
+  "lineage": {
+    "backend_active": true,
+    "ingested_total": 5120,
+    "table_size": 812,
+    "exec_total": 1300,
+    "exec_with_parent_total": 1296,
+    "exec_parent_resolved_total": 1104,
+    "self_parent_total": 0
+  }
+}
+```
+
+`kernel_exec` is the packet the detector attaches to that pid's sessions and file writes (it also carries `uid`, `argv_sha256`, `argv_len`, signing identity, `started_at_ms`, `exited`, `task_access_count`); `ancestry` is nearest-first and stops at a parent the table never saw or whose pid another process took since. `found: false` with `kernel_exec: null` means the table holds no record of the pid. `{"success": false, "error": "..."}` when the table was busy during a tick (retry) or the build has no kernel stream. `self_parent_total` counts events that named a process as its own parent, a sensor defect that must stay 0; the same counters appear on `get_attack_pattern_detector_status` as `process_lineage_exec_total`, `process_lineage_exec_with_parent_total`, `process_lineage_exec_parent_resolved_total` and `process_lineage_self_parent_total`. The posture security gate's kernel-ancestry check (`tests/security/run_lineage_gate.py`) reads this RPC on every platform.
+
 #### export_attack_pattern_finding_details
 
 ```
