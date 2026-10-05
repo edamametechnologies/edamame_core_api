@@ -1955,6 +1955,9 @@ Export a neutral, consumer-agnostic diagnostic record for a single attack-patter
     "report_id":        "<uuid>",
     "report_timestamp": "<ISO8601>",
     "debug_trace":      { /* VulnerabilityDebugTrace */ } | null,
+    "finding_input_slice": { /* the finding's replayable input */ } | null,
+    "finding_input_slice_source": "trace" | "grading_evidence" | null,
+    "grading_evidence": { "graded_by", "detector_severity", "adjudicator_demoted" } | null,
     "captured_at":      "<ISO8601>",
     "core_version":     "<X.Y.Z>",
     "platform":         "macos" | "linux" | "windows" | "ios" | "android",
@@ -1963,7 +1966,7 @@ Export a neutral, consumer-agnostic diagnostic record for a single attack-patter
 }
 ```
 
-On failure, returns `{ "success": false, "error": "..." }`. The `debug_trace` field carries the full `VulnerabilityDebugTrace` (including the `input_snapshot` used for replay) while the report's trace is still kept: traces are kept by default and dropped when the daemon runs with `EDAMAME_DISABLE_DEBUG_TRACES=1`; it is `null` when no trace is kept for that report.
+On failure, returns `{ "success": false, "error": "..." }`. `finding_input_slice` is the finding's replayable input: from the report's debug trace while it is kept (`finding_input_slice_source: "trace"`), otherwise from the grading evidence saved with the finding since 2.0.3 (`"grading_evidence"`, with `grading_evidence` naming the detector version and grade it was recorded under), or `null` when neither exists. The `debug_trace` field carries the full `VulnerabilityDebugTrace` (including the `input_snapshot` used for replay) while the report's trace is still kept: traces are kept by default and dropped when the daemon runs with `EDAMAME_DISABLE_DEBUG_TRACES=1`; it is `null` when no trace is kept for that report.
 
 This RPC is consumer-neutral by design. Known consumers:
 
@@ -1979,6 +1982,14 @@ Operator-only dismissal-rule plane: every `agentic_*_dismissal*` RPC mutates EDA
 
 Since 2.0 the same store holds the `session` domain: network-session dismissals under the scopes `destination` (matcher `destination_ip` + `destination_port`, plus `process_name` / `process_path` when the session is attributed), `destination_port` (`destination_port`, plus the process when attributed) and `process` (`process_name` or `process_path`). Session scopes are rejected on the finding domains and the finding scopes on the session domain. Session rules carry the fixed severity `HIGH` and are created by the `add_dismiss_rule_from_*` RPCs above or directly through `agentic_add_dismissal_rule`.
 
+
+#### export_divergence_ingest_details
+
+```
+export_divergence_ingest_details(request_json: String) -> String
+```
+
+Export the transcript observer's last ingest for one agent type, so a divergence false positive born in the ingest (transcript parsing, the behavioral-model answer, its normalization) can be replayed offline. `request_json` is `{ "agent_type": "<agent>" }`. Returns `{ "success": true, "export": { ... } }` with the raw reasoning-session payload rebuilt from the stored slice, the model's answer text (kept in memory only, last 16 per contributor), the tick's telemetry and the file events the next tick would read, the declaration ledger for the payload's sessions, the latest verdict and provenance; or `{ "success": false, "error": "..." }`. Transcript text follows the visibility tier: verbatim at `forensic_full_content`, masked at `redacted_excerpt`, refused at `metadata_only`. Operator-only: not an MCP tool. Consumer: `edamame_core/tools/divergence_ingest_from_export.sh`, which shapes an entry for `tests/divergence_ingest_corpus/` (`cargo test --test divergence_ingest_replay`).
 #### agentic_dismiss_with_scope
 
 ```
