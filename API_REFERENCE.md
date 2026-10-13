@@ -136,6 +136,22 @@ get_helper_state() -> String
 
 Returns the current state of the helper daemon (active, inactive, etc.).
 
+### get_helper_sync_status
+
+```
+get_helper_sync_status() -> HelperSyncStatusAPI
+```
+
+Read-only (2.0.8). App path: what the app/helper state sync last saw and did. Packet capture, its policy (enforced whitelist, custom white- and blacklists, session filter) and the file monitor run in the EDAMAME Helper and are lost when it restarts; the app records what it wants running and applies it again when the helper becomes available, when the helper answers with a new instance id (a restart), and every 60 s.
+
+- `active`: false where no helper is synced (posture and other standalone builds, a CLI one-shot); every other field is then empty.
+- `helper_instance_id`, `helper_started_at`: the helper process last seen (helpers from 2.0.8 on; empty for older helpers).
+- `helper_restarts_detected`, `last_restart_detected_at`: restarts seen through a changed instance id since the app started.
+- `last_pass_at`, `last_pass_reason` (`became_usable`, `restarted`, `periodic`): the last sync pass.
+- `capture_in_sync`, `capture_policy_in_sync`, `file_monitor_in_sync`: whether each is in place after that pass; `null` when unknown (the helper did not answer) or, for the policy, when no policy was ever set.
+- `last_repair`, `last_repair_at`: what the last pass that changed anything did, for example `file monitor restarted`.
+- `last_error`: what the last pass could not do, empty when nothing failed.
+
 ### get_model_authenticity_status
 
 ```
