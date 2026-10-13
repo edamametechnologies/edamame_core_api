@@ -1996,7 +1996,8 @@ Export a neutral, consumer-agnostic diagnostic record for a single attack-patter
     "debug_trace":      { /* VulnerabilityDebugTrace */ } | null,
     "finding_input_slice": { /* the finding's replayable input */ } | null,
     "finding_input_slice_source": "trace" | "grading_evidence" | null,
-    "grading_evidence": { "graded_by", "detector_severity", "adjudicator_demoted" } | null,
+    "grading_evidence": { "graded_by", "detector_severity", "adjudicator_demoted", "captured_at", "evaluated_at" } | null,
+    "evaluated_at":     "<ISO8601>" | null,
     "captured_at":      "<ISO8601>",
     "core_version":     "<X.Y.Z>",
     "platform":         "macos" | "linux" | "windows" | "ios" | "android",
@@ -2005,7 +2006,7 @@ Export a neutral, consumer-agnostic diagnostic record for a single attack-patter
 }
 ```
 
-On failure, returns `{ "success": false, "error": "..." }`. `finding_input_slice` is the finding's replayable input: from the report's debug trace while it is kept (`finding_input_slice_source: "trace"`), otherwise from the grading evidence saved with the finding since 2.0.3 (`"grading_evidence"`, with `grading_evidence` naming the detector version and grade it was recorded under), or `null` when neither exists. The `debug_trace` field carries the full `VulnerabilityDebugTrace` (including the `input_snapshot` used for replay) while the report's trace is still kept: traces are kept by default and dropped when the daemon runs with `EDAMAME_DISABLE_DEBUG_TRACES=1`; it is `null` when no trace is kept for that report.
+On failure, returns `{ "success": false, "error": "..." }`. `finding_input_slice` is the finding's replayable input: from the report's debug trace while it is kept (`finding_input_slice_source: "trace"`), otherwise from the grading evidence saved with the finding since 2.0.3 (`"grading_evidence"`, with `grading_evidence` naming the detector version and grade it was recorded under), or `null` when neither exists. `evaluated_at` (since 2.0.8) is the moment the detector evaluated that input: a replay of `finding_input_slice` must run at that time (the detector's recency checks are relative to it), and it is `null` for a trace recorded without it. The `debug_trace` field carries the full `VulnerabilityDebugTrace` (including the `input_snapshot` used for replay) while the report's trace is still kept: traces are kept by default and dropped when the daemon runs with `EDAMAME_DISABLE_DEBUG_TRACES=1`; it is `null` when no trace is kept for that report.
 
 This RPC is consumer-neutral by design. Known consumers:
 
