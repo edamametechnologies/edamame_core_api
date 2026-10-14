@@ -1922,6 +1922,22 @@ clear_attack_pattern_history() -> ()
 
 Canonical name; `clear_vulnerability_history` is its legacy alias.
 
+#### clear_detections
+
+```
+clear_detections(attack_patterns: bool, divergence: bool) -> ()
+```
+
+The operator's Clear of the detections (2.0.8): clears the attack-pattern
+history and/or the divergence history, then the inputs both engines read --
+the captured sessions (the helper's, the core's mirror and the anomaly
+analyzer's caches), the file events and the process task-access edges -- so a
+cleared finding comes back only if its activity happens again. Process lineage,
+the anomaly and behavioral models and the dismissal rules are kept. The engine
+clears alone (`clear_attack_pattern_history`, `clear_divergence_history`) keep
+the inputs. A detector run already in progress when the clear lands drops its
+result. Operator-only: not exposed over MCP.
+
 #### reset_attack_pattern_suppressions
 
 ```
