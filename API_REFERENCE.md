@@ -152,6 +152,20 @@ Read-only (2.0.8). App path: what the app/helper state sync last saw and did. Pa
 - `last_repair`, `last_repair_at`: what the last pass that changed anything did, for example `file monitor restarted`.
 - `last_error`: what the last pass could not do, empty when nothing failed.
 
+### get_coverage_status
+
+```
+get_coverage_status() -> CoverageStatusAPI
+```
+
+Read-only (2.1.0). The per-host coverage record: which sensors run and since when. The runtime owner (the app, the posture daemon) refreshes it every minute, and since 2.1.1 a read measures it again when the last record is more than 10 s old or predates protection last coming on; on iOS and Android the record is empty.
+
+- `measured_at`: RFC 3339, empty when never measured.
+- `protection_enabled`: agentic protection is on.
+- `sensors`: one `SensorCoverageAPI` per sensor, with `sensor` (`packet_capture`, `file_monitor`, `helper` on the app path, `kernel_process_events`, `fim_attribution`, `credential_opens`, `transcript_observer:<agent>`, `attack_pattern_detector`, `divergence_engine`, `adjudication_model`), `state`, `detail` (an English diagnostic) and `since` (RFC 3339: when the sensor entered that state, as far as this process observed).
+- `state`: `running`, `stopped`, `starting` (2.1.1: a sensor protection relies on that is not up yet, within five minutes of protection coming on or of the process starting with protection on), `degraded` (running, but not delivering what protection reads from it) or `unmeasured` (could not be checked here; never "absent").
+- `degraded`: the sensors protection relies on (`packet_capture`, `file_monitor`, `kernel_process_events`, `fim_attribution`, `helper`) that are stopped or degraded while protection is on. Empty while protection is off; a `starting` sensor is not in it. Each new non-empty set raises one `monitoring_degraded` notification.
+
 ### get_model_authenticity_status
 
 ```
@@ -2117,6 +2131,30 @@ agentic_prune_expired_dismissal_rules() -> String
 ```
 
 Force a single sweep that removes any dismissal rules whose `ttl_secs` has elapsed. Returns `{ "success": true, "removed": <count> }`. The detector tick performs this sweep automatically; this RPC is for operator-driven maintenance.
+
+#### agentic_add_standing_grant
+
+```
+agentic_add_standing_grant(grant_json: String) -> String
+```
+
+(2.1.0) Add a standing operator grant: an authorization the operator writes once, which the divergence policy plane counts like the human's own words (a scope claim or growth a grant covers is authorized). `grant_json` is `{ "dimension": "...", "value": "...", "agent_type"?: "<agent>", "reason"?: "...", "expires_at"?: "<RFC 3339>" }`. `dimension` is one of `expected_traffic`, `expected_lan_devices`, `expected_open_files`, `expected_sensitive_files`, `expected_system_config` and `expected_local_open_ports` (whose `value` is a port number); an omitted `agent_type` covers every agent, and `expires_at` must be in the future. An equal grant (same dimension, value and agent) is refused, and at most 200 grants are kept. Returns `{ "success": true, "grant": StandingGrantAPI }` (its `id` is what `agentic_remove_standing_grant` takes) or `{ "success": false, "error": "..." }`. Operator-only: not an MCP tool (the observed agent must not widen its own authority).
+
+#### agentic_remove_standing_grant
+
+```
+agentic_remove_standing_grant(grant_id: String) -> String
+```
+
+(2.1.0) Remove a standing operator grant by id. Returns `{ "success": true, "removed": bool }` or `{ "success": false, "error": "..." }`. Operator-only: not an MCP tool.
+
+#### agentic_list_standing_grants
+
+```
+agentic_list_standing_grants() -> String
+```
+
+(2.1.0) List the standing operator grants, expired ones included. Returns `{ "success": true, "grants": [StandingGrantAPI, ...] }`; a `StandingGrantAPI` carries `id`, `dimension`, `value`, `agent_type` (absent: every agent), `reason`, `created_at` and `expires_at` (absent: no expiry). Operator-only: not an MCP tool.
 
 ### Agent Plugins (read-only registry; mutators retired 1.7.0)
 
