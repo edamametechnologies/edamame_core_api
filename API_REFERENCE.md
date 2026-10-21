@@ -2069,6 +2069,14 @@ Operator-only dismissal-rule plane: every `agentic_*_dismissal*` RPC mutates EDA
 Since 2.0 the same store holds the `session` domain: network-session dismissals under the scopes `destination` (matcher `destination_ip` + `destination_port`, plus `process_name` / `process_path` when the session is attributed), `destination_port` (`destination_port`, plus the process when attributed) and `process` (`process_name` or `process_path`). Session scopes are rejected on the finding domains and the finding scopes on the session domain. Session rules carry the fixed severity `HIGH` and are created by the `add_dismiss_rule_from_*` RPCs above or directly through `agentic_add_dismissal_rule`.
 
 
+#### get_attack_pattern_finding_sessions
+
+```
+get_attack_pattern_finding_sessions(finding_key: String) -> Vec<SessionInfoAPI>
+```
+
+Read-only (2.1.1). The sessions an attack-pattern finding was graded from, as the capture recorded them, in the `get_session_by_uid` shape. A finding stays in history until it is dismissed, while the capture prunes sessions that ended; once `get_session_by_uid` no longer finds the finding's `session_uids`, this is what its details show. From the same record `export_attack_pattern_finding_details` reads (`finding_input_slice`): the sessions input, then the anomalous and blacklisted sessions it does not hold, one per session uid. Command lines are redacted as in the export: the record outlives the session. Empty when the history no longer holds the finding or what it was graded from.
+
 #### export_divergence_ingest_details
 
 ```
