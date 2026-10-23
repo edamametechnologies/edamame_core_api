@@ -1447,6 +1447,8 @@ agentic_get_action_history() -> Vec<ActionRecordAPI>
 
 Returns the complete action audit trail (last 30 days). Three kinds of record share the list, told apart by `action_type`: advisor actions (`RemediateThreat`, `DismissSession`, ...), attack-pattern findings (`action_type = "VulnerabilityDetection"`, `advice_type = "Vulnerability"`, kept until dismissed) and, since 2.0.0, divergence evidence (`action_type = "DivergenceDetection"`, `advice_type = "Divergence"`, aged out after 30 days). Both finding kinds carry a `finding_key`, a `dismissed` flag and the same flattened finding fields; for divergence rows `vulnerability_check` is the evidence category, `vulnerability_reference` names the plane and category, `vulnerability_open_files` lists the unexpected sensitive paths and `vulnerability_detection_basis` the trigger reason. Dismiss either kind through `agentic_dismiss_with_scope` with the matching `domain` (`scope = finding` for a one-off), and restore by removing the rule named in the row's `dismissed_by_rule` with `agentic_remove_dismissal_rule`.
 
+Since 2.2.0, attack-pattern rows also carry the core's own reading of them, so a client counts nothing itself: `vulnerability_alertable` (HIGH or CRITICAL, not dismissed, not stale), `vulnerability_stale`, `vulnerability_recent` (first seen or seen again in the last 7 days), `vulnerability_adjudication` (`model_keep`, `model_demote`, `model_overridden`, `model_no_verdict`, `reused`, `deterministic`, `unavailable`), `vulnerability_episode_member_count` (on a grouped finding) and `vulnerability_regrade` (the latest re-grade an upgrade made, `HIGH -> LOW, replayed, 2.2.0`).
+
 #### agentic_get_workflow_status
 
 ```
@@ -1878,7 +1880,7 @@ Get the per-check evaluation trace for a specific vulnerability report (matched 
 get_vulnerability_detector_status() -> String
 ```
 
-Get detector status as JSON: running state, interval, last run timestamp, current active-finding counts, `adjudication_mode` (the mode the detector runs in now), `adjudication_auto` (2.0.0: resolved from the LLM connection rather than pinned), `adjudication_status`, capture / content-scan / ticker liveness fields.
+Get detector status as JSON: running state, interval, last run timestamp, current active-finding counts, `adjudication_mode` (the mode the detector runs in now), `adjudication_auto` (2.0.0: resolved from the LLM connection rather than pinned), `adjudication_status`, capture / content-scan / ticker liveness fields. Since 2.2.0: `recent_alertable_findings` (alertable findings first seen or seen again in the last 7 days, the number the app shows; `active_alertable_findings` counts every alertable finding that is not stale), `process_events_source` (`ring` when the process-event sensor runs in the same process, the posture daemon; `helper` when the app's core reads it from the helper) and `process_events_relay_gaps_total`, and `last_regrade.regraded_from_shape` (records an upgrade re-graded from their own fields).
 
 #### debug_run_vulnerability_detector_tick
 
@@ -1919,6 +1921,11 @@ get_attack_pattern_findings() -> String
 Canonical name; `get_vulnerability_findings` is its legacy alias. Returns the latest report as JSON (`{"findings": null}` when there is none): `report_id`, `timestamp` (the earliest first detection of the report's newest group), `findings`, `decision_source`, `llm_decision`, `human_alert`, `trace_available`. The findings are the newest group plus every active finding carried forward from history until it is dismissed.
 
 Each finding carries `finding_key`, `check`, `severity`, `description`, `reference`, `dismissed`, `dismissed_by_rule`, the process and destination fields, `open_files`, `detection_basis`, `subject_path`, `evidence` / `evidence_score` when present, and, since 2.0.3, `first_detected`: when the history first recorded that finding, RFC 3339 UTC (`"2026-09-28T17:57:03.418Z"`, fraction optional). It is the record's first detection, kept across re-detections, carry-forward and restarts, so it tells a finding first seen during a CI job from one an earlier job left active on a persistent runner (`edamame_posture attack-pattern-status --fail-on-findings --since <RFC 3339>`, `edamame_posture_action`'s job-scoped gate). Every finding this method returns has one; a daemon before 2.0.3 omits the field.
+
+Since 2.2.0:
+
+- `episode` (object, present only on a grouped finding): related detections of one program, for one check, below one location, are reported as one finding at the grade of the strongest of them. `member_count` (how many findings it stands for), `members` (up to 20, strongest first: `finding_key`, `severity`, `subject_path`, `destination`), `root`, `writer`, `first_member_detected`. The finding's own `first_detected` is its newest member's, so a member that joins later reads as a new detection for a job-scoped gate; `first_member_detected` keeps the earliest.
+- `stale` (bool, omitted when false): the finding has not been seen again for 14 days and can no longer be re-evaluated; it stays listed but no longer counts as alertable.
 
 #### get_attack_pattern_history
 
