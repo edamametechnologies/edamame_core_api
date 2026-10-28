@@ -1349,7 +1349,7 @@ Turn the three loops on or off together. On enables the Assistant at its persist
 agentic_get_protection_status() -> AgenticProtectionStatusAPI
 ```
 
-Returns `enabled` (true while any of the three loops runs, so one call to `agentic_set_protection(false)` always turns everything off), `assistant`, `attack_pattern_detection`, `divergence_detection`, and `detection_available` (whether the detection engines exist on this platform).
+Returns `enabled` (true while any of the three loops runs, so one call to `agentic_set_protection(false)` always turns everything off), `assistant`, `attack_pattern_detection`, `divergence_detection`, and `detection_available` (whether the detection engines exist on this platform). In demo mode it reports protection on (the engines where this platform has them), like the rest of the demo data.
 
 ### Auto-Processing
 
@@ -1367,7 +1367,7 @@ Configure the Assistant's level (`mode`: 1 = Review, recommend and wait for conf
 agentic_get_auto_processing_status() -> AgenticAutoProcessingStatusAPI
 ```
 
-Returns the current auto-processing configuration and status.
+Returns the current auto-processing configuration and status. In demo mode it reports the Assistant on at Review.
 
 ### LLM Configuration
 
@@ -1409,7 +1409,7 @@ This same call also persists optional team-delivery routing for runtime security
 agentic_get_llm_config() -> LLMConfigInfoAPI
 ```
 
-Returns the current LLM configuration and saved delivery-channel settings (provider, model, base_url, API key presence and value, Slack routing, Telegram routing, Telegram interactive state, and export_to_portal flag).
+Returns the current LLM configuration and saved delivery-channel settings (provider, model, base_url, API key presence and value, Slack routing, Telegram routing, Telegram interactive state, and export_to_portal flag). In demo mode it reports a Portal sign-in of the demo account; no credential is created and the detection loops keep the real configuration.
 
 #### agentic_set_telegram_interactive_config
 
