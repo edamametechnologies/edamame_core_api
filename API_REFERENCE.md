@@ -1882,6 +1882,19 @@ get_vulnerability_detector_status() -> String
 
 Get detector status as JSON: running state, interval, last run timestamp, current active-finding counts, `adjudication_mode` (the mode the detector runs in now), `adjudication_auto` (2.0.0: resolved from the LLM connection rather than pinned), `adjudication_status`, capture / content-scan / ticker liveness fields. Since 2.2.0: `recent_alertable_findings` (alertable findings first seen or seen again in the last 7 days, the number the app shows; `active_alertable_findings` counts every alertable finding that is not stale), `process_events_source` (`ring` when the process-event sensor runs in the same process, the posture daemon; `helper` when the app's core reads it from the helper) and `process_events_relay_gaps_total`, and `last_regrade.regraded_from_shape` (records an upgrade re-graded from their own fields).
 
+Since 2.2.2 the status also carries `binary_attestation` (object): how the
+detector's signature verification of the binaries it grades has been going
+(the helper verifies them on the app path, the core in process standalone).
+`orders_sent`, `orders_answered`, `orders_failed` (the helper not enabled, no
+answer after the one retry, or an error it answered with),
+`binaries_requested`, `binaries_measured` (a signature verdict),
+`binaries_unmeasured` (not in the answer because the batch stopped at its
+budget, a check that could not run, or a failed order), `last_order_at` and
+`last_answered_at` (RFC 3339, empty before the first order or answer),
+`last_error` (empty when the last order was answered) and `last_source`
+(`helper` or `in_process`). The other fields are unchanged, so a consumer
+that parses the status as before keeps working.
+
 #### debug_run_vulnerability_detector_tick
 
 ```
