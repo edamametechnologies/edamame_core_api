@@ -326,7 +326,7 @@ When `with_ai_details` is true, `ScoreAPI.ai_details` carries the local AI gover
 | `coverage[]` | Agent inventory rows (`kind`, `key`, `present`, `monitored`) |
 | `checks[]` | Per-Active-check failure causes (`check`, `references[]`, `causes[]`, `context[]`, `truncated`). `references[]` are the check-level framework tokens (`OWASP-ASI05`, `OWASP-LLM06`, `AML.T0053`, `TC-AID-01`, `ISO42001-A.4.5`, `ISO27001-A.8.31`) derived from the same crosswalk as the OWASP / ATLAS / Trust Controls scorecards; metadata only, never consulted for severity or acceptance |
 
-Consent gates Hub export, not on-device observation: the local payload is included even when `mode` is `"denied"`. When `with_ai_details` is false, `ai_details` is `null`. See `edamame_core/AIGOVERNANCE.md`.
+Consent gates Hub export, not on-device observation: the local payload is included even when `mode` is `"denied"`. When `with_ai_details` is false, `ai_details` is `null`. See [`12-ai-governance.md`](../edamame_core/docs/ai-security/12-ai-governance.md).
 
 `ScoreAPI` also includes: overall score (0–100) and stars (0.0–5.0), the five dimension scores, `ai` (since 2.0: the AI Agent Posture axis, an overlay computed from the metrics tagged `AI Agent Posture`; it does not change `overall` and is `-1` when the model has no such metric), threat lists with status, model metadata, and compliance.
 
@@ -1801,7 +1801,7 @@ Enable or disable the attack pattern detector with optional interval configurati
 set_vulnerability_adjudication_mode(mode: String) -> String
 ```
 
-Operator plane. How the detector publishes when the LLM adjudicator is absent: `llm` (a tick the LLM did not answer is withheld -- empty report, `adjudication_status: error|unavailable`; what a CI gate wants, see `edamame_posture`), `advisory` (the LLM is consulted; on failure or with no provider the deterministic result is published with `decision_source: DETERMINISTIC_ONLY`), `deterministic` (the LLM, the benign verdict cache and history reuse are never consulted; every tick publishes deterministically), or `auto` (default since 2.0.0: `advisory` while the LLM config carries credentials -- Portal tokens or API key, an own-model key, an Ollama endpoint -- and `deterministic` otherwise, so nothing is ever withheld on a host that did not pin `llm`). Persisted with the agentic config; `get_vulnerability_detector_status` reports the mode the detector runs in as `adjudication_mode` and whether it was resolved as `adjudication_auto`. Fallible envelope: `{"success": true, "mode": "<setting>", "effective_mode": "<mode>"}`. Not exposed over MCP: the observed agent must not choose its own adjudication. Added 2026-09-13; `auto` in 2.0.0; the measured trade is in `edamame_core/VULNERABILITYDETECTION.md`, "What The Adjudicator Adds, And Publication Without It".
+Operator plane. How the detector publishes when the LLM adjudicator is absent: `llm` (a tick the LLM did not answer is withheld -- empty report, `adjudication_status: error|unavailable`; what a CI gate wants, see `edamame_posture`), `advisory` (the LLM is consulted; on failure or with no provider the deterministic result is published with `decision_source: DETERMINISTIC_ONLY`), `deterministic` (the LLM, the benign verdict cache and history reuse are never consulted; every tick publishes deterministically), or `auto` (default since 2.0.0: `advisory` while the LLM config carries credentials -- Portal tokens or API key, an own-model key, an Ollama endpoint -- and `deterministic` otherwise, so nothing is ever withheld on a host that did not pin `llm`). Persisted with the agentic config; `get_vulnerability_detector_status` reports the mode the detector runs in as `adjudication_mode` and whether it was resolved as `adjudication_auto`. Fallible envelope: `{"success": true, "mode": "<setting>", "effective_mode": "<mode>"}`. Not exposed over MCP: the observed agent must not choose its own adjudication. Added 2026-09-13; `auto` in 2.0.0; the measured trade is in [`07-attack-pattern-detector.md`](../edamame_core/docs/ai-security/07-attack-pattern-detector.md), "What The Adjudicator Adds, And Publication Without It".
 
 #### get_vulnerability_findings
 
@@ -2208,7 +2208,7 @@ get_agent_plugin_health, uninstall_agent_plugin -->
 
 ### External Transcript Observer
 
-Per-agent host-side observer that reads each discovered agent's transcripts from disk and feeds the existing `upsert_behavioral_model_from_raw_sessions` pipeline (see `AGENTIC.md`). Discovery (`discovered`: transcript root on disk) is independent of both plugin install (`installed`) and product presence (`installed_on_host`: config or instruction root on disk). An agent can be installed on the host before it has ever written transcripts; the inventory lists that as installed, not yet observed. Pausing the observer for a discovered agent trips the corresponding `unsecured_<agent>` internal threat. An installed-but-never-run agent is not unsecured.
+Per-agent host-side observer that reads each discovered agent's transcripts from disk and feeds the existing `upsert_behavioral_model_from_raw_sessions` pipeline (see [`03-architecture.md`](../edamame_core/docs/ai-security/03-architecture.md)). Discovery (`discovered`: transcript root on disk) is independent of both plugin install (`installed`) and product presence (`installed_on_host`: config or instruction root on disk). An agent can be installed on the host before it has ever written transcripts; the inventory lists that as installed, not yet observed. Pausing the observer for a discovered agent trips the corresponding `unsecured_<agent>` internal threat. An installed-but-never-run agent is not unsecured.
 
 #### get_transcript_observer_status
 
@@ -2388,7 +2388,7 @@ Toggle the notification digest preference. Infallible: turning the digest off fl
 
 Read-only projection of the durable metrics-history time-series database (TSDB). The core's `metrics_rollup_task` folds per-agent and per-session telemetry into bounded `hourly` and `daily` buckets (token/cost by agent, LLM calls by model, MCP calls by server, network bytes in/out by domain, file events by type, ...), persisted to user-space storage with a retention policy. This is the LLM-free backend for the Agents tab Behavior subtab Trends charts. Requires the `agentic` feature flag.
 
-**Source**: `api/api_metrics.rs`. See `AGENTIC.md` ("Metrics history") in the core repo for the rollup families and retention model.
+**Source**: `api/api_metrics.rs`. See [`03-architecture.md`](../edamame_core/docs/ai-security/03-architecture.md) ("Metrics history") in the core repo for the rollup families and retention model.
 
 ### get_metrics_history
 
@@ -2436,7 +2436,7 @@ Ingest one health data point. `json` is a serialized `HealthDataPoint` (`data_ty
 
 File integrity monitoring engine. Watches a configured set of paths for create / modify / rename / delete events, hashes content with BLAKE3 (subject to `fim_hash_size_threshold`), and feeds events into the attack pattern detector for sensitive-path / temp-staging analysis. Requires the `fim` feature flag.
 
-**Source**: `api/api_fim.rs`. See `FIM.md` in the core repo for the engine architecture and helper/standalone convergence story.
+**Source**: `api/api_fim.rs`. See [`04-observation-and-enrichment.md`](../edamame_core/docs/ai-security/04-observation-and-enrichment.md) in the core repo for the engine architecture and helper/standalone convergence story.
 
 ### start_file_monitor
 
@@ -2596,7 +2596,7 @@ derived from the inventory row's footprint booleans and reported as the
 `unsecured_<agent>` internal threat. Requires the `agentic` feature flag.
 
 Observer-independence (I1): read RPCs may be exposed as read-only MCP tools where
-still compiled; mutators are operator/UI only. See `VISIBILITYIMPROVEMENTS.md`.
+still compiled; mutators are operator/UI only. See [`06-agent-visibility-and-telemetry.md`](../edamame_core/docs/ai-security/06-agent-visibility-and-telemetry.md).
 
 **Source**: `api/api_visibility.rs`
 
@@ -2846,7 +2846,7 @@ get_a2a_graph() -> String
 get_owasp_scorecard() -> String
 ```
 
-Return the OWASP GenAI crosswalk scorecard as JSON: static per-category coverage grades (from `OWASPGENAI.md`) plus live finding attribution parsed from the `OWASP-<id>` reference tokens already carried by visibility and attack-pattern findings, with the `headline_status` (`clean`/`attention`/`critical`) derived directly from the attributed alertable findings. Read-only, derived; no separate refresh. MCP-safe read.
+Return the OWASP GenAI crosswalk scorecard as JSON: static per-category coverage grades (from [`23-framework-crosswalks.md`](../edamame_core/docs/ai-security/23-framework-crosswalks.md)) plus live finding attribution parsed from the `OWASP-<id>` reference tokens already carried by visibility and attack-pattern findings, with the `headline_status` (`clean`/`attention`/`critical`) derived directly from the attributed alertable findings. Read-only, derived; no separate refresh. MCP-safe read.
 
 ### get_trust_controls_scorecard
 

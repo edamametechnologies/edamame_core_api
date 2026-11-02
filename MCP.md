@@ -415,7 +415,7 @@ Get historical vulnerability reports (summaries, most recent first). Each entry 
 
 ## Recurrence-Aware Dismissal Rules (read-only)
 
-EDAMAME supports recurrence-aware dismissal rules that suppress entire classes of findings (for example "all `process_for_check` findings for `node` running `cursor-stable`" or "all `agent_workspace_pattern` divergence findings for one Cursor workspace"). See [edamame_core/AGENTICIMPROVEMENTS.md](https://github.com/edamametechnologies/edamame_core/blob/main/AGENTICIMPROVEMENTS.md) for the full rule model.
+EDAMAME supports recurrence-aware dismissal rules that suppress entire classes of findings (for example "all `process_for_check` findings for `node` running `cursor-stable`" or "all `agent_workspace_pattern` divergence findings for one Cursor workspace"). See [edamame_core/11-control-surfaces.md](../edamame_core/docs/ai-security/11-control-surfaces.md) for the full rule model.
 
 The MCP surface exposes these rules as **read-only**: the LLM can see what is being suppressed (and feed that into reasoning prompts) but cannot create, modify, or remove rules. Operators manage rules through the EDAMAME app's `AI > Dismissal rules` section or the `edamame_cli` RPC surface.
 
